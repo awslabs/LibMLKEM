@@ -143,19 +143,20 @@ is
          elsif L (1 .. 5) = "sk = " then
             TK.Expected_SK := String_To_Bytes (String (L (6 .. L'Last)));
 
-         elsif L (1 .. 5) = "ct = " then
-            TK.Expected_CT := String_To_Bytes (String (L (6 .. L'Last)));
-
-         elsif L (1 .. 5) = "ss = " then
-            TK.Expected_SS := String_To_Bytes (String (L (6 .. L'Last)));
-
          elsif L (1 .. 7) = "ct_n = " then
             TK.Expected_CT_N := String_To_Bytes (String (L (8 .. L'Last)));
 
          elsif L (1 .. 7) = "ss_n = " then
             TK.Expected_SS_N := String_To_Bytes (String (L (8 .. L'Last)));
-            --  The "ss_n = " line signifies a complete KAT, so let's go...
+
+         elsif L (1 .. 5) = "ct = " then
+            TK.Expected_CT := String_To_Bytes (String (L (6 .. L'Last)));
+
+         elsif L (1 .. 5) = "ss = " then
+            TK.Expected_SS := String_To_Bytes (String (L (6 .. L'Last)));
+            --  The "ss = " line signifies a complete KAT, so let's go...
             Ready := True;
+
          end if;
 
 
@@ -201,10 +202,10 @@ is
          --  Report the computed answers for comparison with the inputs
          Put_Line ("pk = ", TK.Computed_PK);
          Put_Line ("sk = ", TK.Computed_SK);
-         Put_Line ("ct = ", TK.Computed_CT);
-         Put_Line ("ss = ", TK.Computed_SS1);
          Put_Line ("ct_n = ", TK.Expected_CT_N);
          Put_Line ("ss_n = ", TK.Computed_SS_N);
+         Put_Line ("ct = ", TK.Computed_CT);
+         Put_Line ("ss = ", TK.Computed_SS1);
 
          if TK.Expected_PK /= TK.Computed_PK then
             Put_Line ("PK Fail");
