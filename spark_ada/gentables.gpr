@@ -1,0 +1,38 @@
+--  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+--  SPDX-License-Identifier: Apache-2.0
+
+with "mlkem.gpr";
+project GenTables is
+
+   for Languages use ("Ada");
+   for Main use ("gentables.adb");
+
+   type Host_OS_Kind is ("Darwin", "Linux", "Windows", "generic");
+   Host_OS : Host_OS_Kind := external("MLKEM_HOSTOS", "generic");
+
+   Opt_Switch := ("-g",
+                  "-O0");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+          Compiler'Default_Switches ("Ada") &
+          Opt_Switch &
+          ("-gnata",
+           "-gnatwa",
+           "-gnaty",
+           "-ffunction-sections", -- Create a linker section for each function
+           "-fdata-sections");    -- Create a linker section for each data
+
+   end Compiler;
+
+   package Linker is
+      case Host_OS is
+         when "Darwin" =>
+            --  Deal with unusual linker on macOS/Darwin
+            for Default_Switches ("Ada") use ("-Wl,-ld_classic");
+         when others =>
+            null;
+      end case;
+  end Linker;
+
+end GenTables;

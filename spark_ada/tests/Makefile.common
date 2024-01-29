@@ -1,0 +1,52 @@
+HOSTOS := $(shell uname -s)
+
+all: diff
+
+diff: new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp unlucky_results.txt unlucky_ref.txt modulus_ref.txt modulus_results.txt
+	@echo "--- Diffing PQShield KAT results - blank response means success  ---"
+	diff new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp
+	@echo "--- Diffing Unlucky KAT result - blank response means success  ---"
+	diff unlucky_results.txt unlucky_ref.txt
+	@echo "--- Diffing Modulus KAT result - blank response means success  ---"
+	diff modulus_results.txt modulus_ref.txt
+
+new.txt: tkats
+	@echo "--- Running tkats ---"
+	./tkats >$@
+
+unlucky_results.txt: tunlucky
+	@echo "--- Running tunlucky ---"
+	./tunlucky >$@
+
+modulus_results.txt: tmodulus
+	@echo "--- Running tmodulus ---"
+	./tmodulus >$@
+
+tkats: tkats.gpr tkats.adb ../lib/libmlkem.a
+	@echo "--- Building tkats ---"
+	gprbuild -Ptkats -XMLKEM_HOSTOS=$(HOSTOS)
+
+tunlucky: tkats.gpr tunlucky.adb ../lib/libmlkem.a
+	@echo "--- Building tunlucky ---"
+	gprbuild -Ptkats -XMLKEM_HOSTOS=$(HOSTOS)
+
+tmodulus: tkats.gpr tmodulus.adb ../lib/libmlkem.a
+	@echo "--- Building tmodulus ---"
+	gprbuild -Ptkats -XMLKEM_HOSTOS=$(HOSTOS)
+
+tkeygen: tkeygen.gpr tkeygen.adb ../lib/libmlkem.a
+	@echo "--- Building tkeygen---"
+	gprbuild -Ptkeygen -XMLKEM_HOSTOS=$(HOSTOS)
+
+../libkeccak/lib/generic_none/libkeccak.a: ../libkeccak/src/common/*.ads ../libkeccak/src/common/*.adb
+	@echo "--- Building libkeccak ---"
+	cd ../libkeccak; alr build
+
+clean:
+	gprclean -Ptkats
+	rm -f new.txt
+	rm -f unlucky_results.txt
+	rm -f modulus_results.txt
+
+cleanall: clean
+	cd ..; gprclean -Pmlkem

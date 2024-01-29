@@ -1,0 +1,6 @@
+[submodule "libkeccak"]
+	path = spark_ada/libkeccak
+	url = https://github.com/damaki/libkeccak.git
+[submodule "KAT"]
+	path = KAT
+	url = https://github.com/post-quantum-cryptography/KAT.git

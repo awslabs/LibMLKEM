@@ -1,0 +1,51 @@
+--  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+--  SPDX-License-Identifier: Apache-2.0
+
+with "../mlkem.gpr";
+project TKeyGen is
+
+   for Languages use ("Ada");
+   for Main use ("tkeygen.adb");
+
+   type Host_OS_Kind is ("Darwin", "Linux", "Windows", "generic");
+   Host_OS : Host_OS_Kind := external("MLKEM_HOSTOS", "generic");
+
+   type Enabled_Kind is ("enabled", "disabled");
+   Coverage_Checks : Enabled_Kind := External ("MLKEM_COVERAGE", "disabled");
+
+   Opt_Switch := ("-g",
+                  "-O0");
+
+   Coverage_Checks_Switches := ();
+   case Coverage_Checks is
+      when "enabled" =>
+         Coverage_Checks_Switches :=
+           ("--coverage");
+      when others => null;
+   end case;
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+          Compiler'Default_Switches ("Ada") &
+          Opt_Switch &
+          Coverage_Checks_Switches &
+          ("-gnata",
+           "-gnatVa",
+           "-gnatwa",
+           "-gnaty",
+           "-ffunction-sections", -- Create a linker section for each function
+           "-fdata-sections");    -- Create a linker section for each data
+
+   end Compiler;
+
+   package Linker is
+      case Host_OS is
+         when "Darwin" =>
+            --  Deal with unusual linker on macOS/Darwin
+            for Default_Switches ("Ada") use Coverage_Checks_Switches & ("-Wl,-ld_classic");
+         when others =>
+            for Default_Switches ("Ada") use Coverage_Checks_Switches;
+      end case;
+  end Linker;
+
+end TKeyGen;

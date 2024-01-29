@@ -1,0 +1,45 @@
+------------------------------------------------
+-- Lean4 proof, kindly supplied by Kevin Buzzard
+------------------------------------------------
+
+import Mathlib
+
+example (A B Q : ℕ) (hQ : Q = 3329) (hA : 0 < A ∧ A < Q)
+    (hB : 0 < B ∧ B < Q) :
+    ((A * B) / Q) * Q ≠ (A * B) := by
+  -- assume the contrary
+  intro h
+  -- replace Q by 3329
+  subst hQ
+  -- key fact: 3329 is prime
+  have h1 : Nat.Prime 3329 := by norm_num
+  -- use our hypotheses about `A * B`
+  have h2 : 3329 ∣ A * B := by
+    use A * B / 3329
+    nth_rw 1 [← h]
+    ring
+  -- mathlib has the key fact that p ∣ AB => p ∣ A or p ∣ B
+  rw [Nat.Prime.dvd_mul h1] at h2
+  -- do the two cases
+  rcases h2 with (h | h)
+  · -- now easy to get a contradiction in both cases
+    have := Nat.eq_zero_of_dvd_of_lt h hA.2
+    linarith
+  · have := Nat.eq_zero_of_dvd_of_lt h hB.2
+    linarith
+
+
+---------------------------------------------------
+-- HOL-Lite proof, kindly supplied by John Harrison
+---------------------------------------------------
+
+needs "Library/prime.ml";;
+needs "Library/pocklington.ml";;
+let rod_lemma = prove
+ (`Q = 3329 /\
+   0 < A /\ A < Q /\
+   0 < B /\ B < Q
+   ==> ~((A * B) DIV Q * Q = A * B)`,
+  REWRITE_TAC[GSYM DIVIDES_DIV_MULT] THEN
+  SIMP_TAC[PRIME_DIVPROD_EQ; PRIME_CONV`prime 3329`] THEN REPEAT STRIP_TAC THEN
+  FIRST_X_ASSUM(MP_TAC o MATCH_MP DIVIDES_LE_STRONG) THEN ASM_ARITH_TAC);;
