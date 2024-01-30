@@ -91,7 +91,8 @@ The code currently implements ML-KEM-768, and executes the tests for that
 variant only.
 
 The code does compile, prove, and run fine if you change the values of
-the K, Eta_1, Eta_2, DU and DV constants (in mlkem.ads) to select the
+the K, Eta_1, Eta_2, DU and DV constants in
+[mlkem.ads](https://github.com/awslabs/LibMLKEM/blob/660ddd586851b401ef44ed49ac82e7af816b3310/spark_ada/src/mlkem.ads#L24) to select the
 appropriate values for ML-KEM-512 and ML-KEM-1024, but I have not
 automated that choice and added test programs for those variants yet.
 
@@ -258,6 +259,8 @@ PATH=$HOME/gnatprove_13.2.1_28fc3583/bin:$PATH
 ```
 
 ### IDEs and Visual Studio Code
+
+An IDE is strictly optional. No IDE is required to compile the code or reproduce the proofs.
 
 The best IDE for SPARK is probably Visual Studio Code. There is an implementation of the
 [Language Server Protocol for Ada](https://marketplace.visualstudio.com/items?itemName=AdaCore.ada)
