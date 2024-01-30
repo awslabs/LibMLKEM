@@ -1,12 +1,21 @@
 --  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 --  SPDX-License-Identifier: Apache-2.0
 
-with Interfaces; use Interfaces;
+with Ada.Real_Time; use Ada.Real_Time;
+with Ada.Text_IO;   use Ada.Text_IO;
+with Interfaces;    use Interfaces;
 
 with MLKEM;       use MLKEM;
 
 procedure TKeyGen
 is
+   subtype Index_48  is I32 range 0 .. 47;
+   subtype Bytes_48  is Byte_Seq (Index_48);
+   Null_Bytes_48 : constant Bytes_48 := (others => 0);
+
+   Null_Bytes_32 : constant Bytes_32 := (others => 0);
+
+
    type MLKEM_KAT is record
       --  KAT inputs and expected results read from the file
       Count        : Natural;
@@ -106,10 +115,16 @@ is
       CK := MLKEM_KeyGen (TK.D, TK.Z);
    end Run_KeyGen_KAT;
 
+   T1, T2 : Time;
+   T3     : Duration;
 begin
    Read_KeyGen_KAT;
+   T1 := Clock;
    for I in 1 .. 1_000_000 loop
       Run_KeyGen_KAT;
       TK.Z (0) := TK.Z (0) + 1;
    end loop;
+   T2 := Clock;
+   T3 := To_Duration (T2 - T1);
+   Put_Line (T3'Img & " microseconds per KeyGen");
 end TKeyGen;
