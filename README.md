@@ -1,7 +1,8 @@
 # LibMLKEM - A new, formal reference implemenation of FIPS 203 ML-KEM
 
 This library presents a new and formally verified implementation of
-FIPS 203 ML-KEM (the algorithm formerly known as Kyber).
+FIPS 203 ML-KEM (the algorithm formerly known as Kyber),
+as specified in the 24th August 2023 Draft of FIPS 203.
 
 The goals of producing these implementations are:
 
