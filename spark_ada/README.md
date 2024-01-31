@@ -1,10 +1,10 @@
-# LibMLKEM - A new, formal reference implemenation of FIPS 203 ML-KEM
+# LibMLKEM - A new, formal reference implementation of FIPS 203 ML-KEM
 
 This library implements ML-KEM, better known as "Kyber", but as
 specified in the 24th August 2023 Draft of FIPS 203.
 
-This implemenation is written in SPARK - a subset of Ada that is designed
-for formal verification - and has been subject to formal verification
+This implementation is written in SPARK - a subset of Ada that is designed
+for static verification - and has been subject to verification
 with the SPARK toolset.
 
 If the reader is not familiar with SPARK, then [start here](https://learn.adacore.com/).
@@ -45,9 +45,9 @@ sticks with simple un-accented names.
 ### Hybrid static and dynamic verification
 
 This implementation takes a hybrid verification approach that combines
-formal verification with dynamic testing. Specifically:
+static verification with dynamic testing. Specifically:
 
-* Formal verification of the absence of undefined behaviour, plus
+* Static verification of the absence of undefined behaviour, plus
 memory-safety and type-safety with respect to the stated types,
 pre-conditions, post-conditions, and assertions. The proof
 is "auto-active" in that it is completely automated
