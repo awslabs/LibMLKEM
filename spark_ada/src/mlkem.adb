@@ -303,14 +303,10 @@ is
    subtype Bits_UDV is Bit_Seq (Index_Bits_UDV);
 
    subtype Index_PRF_Eta_1_Bytes is I32 range 0 .. 64 * Eta_1 - 1;
-   subtype Index_PRF_Eta_2_Bytes is I32 range 0 .. 64 * Eta_2 - 1;
    subtype PRF_Eta_1_Bytes is Byte_Seq (Index_PRF_Eta_1_Bytes);
-   subtype PRF_Eta_2_Bytes is Byte_Seq (Index_PRF_Eta_2_Bytes);
 
-   subtype Index_PRF_Eta_1_Bits is I32 range 0 .. 8 * 64 * Eta_1 - 1;
-   subtype Index_PRF_Eta_2_Bits is I32 range 0 .. 8 * 64 * Eta_2 - 1;
-   subtype PRF_Eta_1_Bits is Bit_Seq (Index_PRF_Eta_1_Bits);
-   subtype PRF_Eta_2_Bits is Bit_Seq (Index_PRF_Eta_2_Bits);
+   subtype Index_PRF_Eta_2_Bytes is I32 range 0 .. 64 * Eta_2 - 1;
+   subtype PRF_Eta_2_Bytes is Byte_Seq (Index_PRF_Eta_2_Bytes);
 
    --------------------------------------------------
    --  Polynomials, plus Vectors and Matrices thereof
@@ -1399,6 +1395,9 @@ is
    function SamplePolyCBD_Eta_1 (B : in PRF_Eta_1_Bytes) return Poly_Zq
      with No_Inline
    is
+      subtype Index_PRF_Eta_1_Bits is I32 range 0 .. 8 * 64 * Eta_1 - 1;
+      subtype PRF_Eta_1_Bits is Bit_Seq (Index_PRF_Eta_1_Bits);
+
       function BytesToBits is new Generic_BytesToBits
         (Index_PRF_Eta_1_Bytes, PRF_Eta_1_Bytes,
          Index_PRF_Eta_1_Bits, PRF_Eta_1_Bits);
@@ -1453,6 +1452,9 @@ is
    function SamplePolyCBD_Eta_2 (B : in PRF_Eta_2_Bytes) return Poly_Zq
      with No_Inline
    is
+      subtype Index_PRF_Eta_2_Bits is I32 range 0 .. 8 * 64 * Eta_2 - 1;
+      subtype PRF_Eta_2_Bits is Bit_Seq (Index_PRF_Eta_2_Bits);
+
       function BytesToBits is new Generic_BytesToBits
         (Index_PRF_Eta_2_Bytes, PRF_Eta_2_Bytes,
          Index_PRF_Eta_2_Bits, PRF_Eta_2_Bits);
