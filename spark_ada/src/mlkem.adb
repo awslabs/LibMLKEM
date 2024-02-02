@@ -36,8 +36,8 @@ is
          R      : I32;
          Reduce : I32;
       begin
-         --  At -O0 and -Og, GCC typically generates a branch for the
-         --  predefined "+" operator on Root_T, so we code
+         --  At -O0 and -Og, GCC typically generates a branch for a
+         --  predefined modular "+" operator, so we code
          --  explicitly here for constant time
 
          R := I32 (Left) + I32 (Right);
