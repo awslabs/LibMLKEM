@@ -160,9 +160,9 @@ library project MLKEM is
                                       "--no-loop-unrolling",
                                       "--level=1",
                                       "--prover=z3,cvc4,altergo",
-                                      "--timeout=10",
+                                      "--timeout=5",
                                       "--memlimit=0",
-                                      "--steps=200000",
+                                      "--steps=50000",
                                       "--report=statistics");
    end Prove;
 
