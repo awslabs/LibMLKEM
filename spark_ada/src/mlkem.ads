@@ -42,9 +42,24 @@ is
    --  DU     : constant := 11;
    --  DV     : constant := 5;
 
-   subtype Byte     is Unsigned_8;
-   subtype I32      is Integer_32;
-   subtype N32      is I32 range 0 .. I32'Last;
+   ----------------------------------------------------------------------
+   --  Parameter set validation
+   ----------------------------------------------------------------------
+
+   --  FIPS 203 section 6 requires that implementations shall confirm
+   --  that only valid sets of parameters are chosen.  This can be
+   --  encoded as an assertion, thus:
+   pragma Assert
+      --  ML-KEM-512
+      ((K = 2 and Eta_1 = 3 and Eta_2 = 2 and DU = 10 and DV = 4) or
+       --  ML-KEM-768
+       (K = 3 and Eta_1 = 2 and Eta_2 = 2 and DU = 10 and DV = 4) or
+       --  ML-KEM-1024
+       (K = 4 and Eta_1 = 2 and Eta_2 = 2 and DU = 11 and DV = 5));
+
+   subtype Byte is Unsigned_8;
+   subtype I32  is Integer_32;
+   subtype N32  is I32 range 0 .. I32'Last;
 
    --  Unconstrained (aka "Size Polymorphic") array of bytes
    type Byte_Seq is array (N32 range <>) of Byte;
