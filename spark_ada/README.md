@@ -379,12 +379,12 @@ Data Dependencies                30           30                                
 Flow Dependencies                 .            .                                                 .           .          .
 Initialization                  127          127                                                 .           .          .
 Non-Aliasing                      .            .                                                 .           .          .
-Run-time Checks                 263            .                 263 (CVC4 3%, Z3 92%, altergo 4%)           .          .
-Assertions                      124            .    124 (CVC4 8%, Trivial 5%, Z3 73%, altergo 14%)           .          .
-Functional Contracts             49            .              49 (Trivial 20%, Z3 75%, altergo 6%)           .          .
+Run-time Checks                 263            .                 263 (CVC4 3%, Z3 92%, altergo 5%)           .          .
+Assertions                      125            .    125 (CVC4 5%, Trivial 6%, Z3 78%, altergo 11%)           .          .
+Functional Contracts             49            .              49 (Trivial 20%, Z3 73%, altergo 8%)           .          .
 LSP Verification                  .            .                                                 .           .          .
 Termination                       .            .                                                 .           .          .
 Concurrency                       .            .                                                 .           .          .
 -------------------------------------------------------------------------------------------------------------------------
-Total                           593    157 (26%)                                         436 (74%)           .          .
+Total                           594    157 (26%)                                         437 (74%)           .          .
 ```
