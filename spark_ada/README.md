@@ -215,7 +215,7 @@ Binaries of the tools are available from:
 1. Install extra command-line tools, libraries, and the CVC4 prover:
 
 ```
-sudo apt install unzip make libc_dev cvc4
+sudo apt install unzip make libc-dev cvc4
 ```
 
 2. Download the "Alire" Ada package manager:
@@ -233,7 +233,7 @@ back in again to let the new PATH work.
 alr toolchain --select
 ```
 
-and pick the latest release of "GNAT_Native" and "GPRBUILD" tools to install.
+and pick the latest release of "gnat_native" and "gprbuild" tools to install.
 
 4. Use alr to download the SPARK toolset below $HOME
 
