@@ -76,6 +76,14 @@ and memcpy() (for assignment and concatenation of arrays) and nothing else.
 
 No other components of the Ada runtime library are used.
 
+### Portability
+
+Given that SPARK is unambiguous, the code should exhibit identical behaviour
+on all target platforms, operating systems, and CPU ISAs. Potential targets
+are only limited by the availability of a reasonably recent build of GCC or
+LLVM that enable the Ada compiler, covering most contemporary 32- and 64-bit
+ISAs.
+
 ## Not Goals
 
 ### Performance
