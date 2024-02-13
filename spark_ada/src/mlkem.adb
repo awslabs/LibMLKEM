@@ -35,7 +35,7 @@ is
    --
    --  Ranges of integers in SPARK (denoted "X .. Y") are _inclusive_
    --  at both ends. Similarly a "slice" of an array object, denoted
-   --  A (X .. Y), is all the elements of A from the A'th to the Y'th
+   --  A (X .. Y), is all the elements of A from the X'th to the Y'th
    --  element inclusive.
    --
    --  Naming
