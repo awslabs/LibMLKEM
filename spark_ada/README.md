@@ -192,9 +192,9 @@ For example, At -O3, the MLKEM package generates 11360 bytes
 of executable code and requires 1096 bytes of read-only constants.
 
 In terms of source lines, the "GNATMetric" tools reports the MLKEM
-package as containing 811 logical lines of code, comprising
-322 statements and 489 declarations. The `gcov` tool reports
-555 source lines that actually generate executable code.
+package as containing 815 logical lines of code, comprising
+322 statements and 493 declarations. The `gcov` tool reports
+554 source lines that actually generate executable code.
 
 ## Getting the tools
 
@@ -389,19 +389,19 @@ In short:
 Summary of SPARK analysis
 =========================
 
--------------------------------------------------------------------------------------------------------------------------
-SPARK Analysis results        Total         Flow                                           Provers   Justified   Unproved
--------------------------------------------------------------------------------------------------------------------------
-Data Dependencies                30           30                                                 .           .          .
-Flow Dependencies                 .            .                                                 .           .          .
-Initialization                  127          127                                                 .           .          .
-Non-Aliasing                      .            .                                                 .           .          .
-Run-time Checks                 263            .                 263 (CVC4 3%, Z3 92%, altergo 5%)           .          .
-Assertions                      125            .    125 (CVC4 5%, Trivial 6%, Z3 78%, altergo 11%)           .          .
-Functional Contracts             49            .              49 (Trivial 20%, Z3 73%, altergo 8%)           .          .
-LSP Verification                  .            .                                                 .           .          .
-Termination                       .            .                                                 .           .          .
-Concurrency                       .            .                                                 .           .          .
--------------------------------------------------------------------------------------------------------------------------
-Total                           594    157 (26%)                                         437 (74%)           .          .
+------------------------------------------------------------------------------------------------------------------------
+SPARK Analysis results        Total         Flow                                          Provers   Justified   Unproved
+------------------------------------------------------------------------------------------------------------------------
+Data Dependencies                30           30                                                .           .          .
+Flow Dependencies                 .            .                                                .           .          .
+Initialization                  126          126                                                .           .          .
+Non-Aliasing                      .            .                                                .           .          .
+Run-time Checks                 270            .                270 (CVC4 2%, Z3 95%, altergo 4%)           .          .
+Assertions                      127            .    127 (CVC4 7%, Trivial 6%, Z3 79%, altergo 9%)           .          .
+Functional Contracts             50            .             50 (Trivial 19%, Z3 75%, altergo 6%)           .          .
+LSP Verification                  .            .                                                .           .          .
+Termination                       .            .                                                .           .          .
+Concurrency                       .            .                                                .           .          .
+------------------------------------------------------------------------------------------------------------------------
+Total                           603    156 (26%)                                        447 (74%)           .          .
 ```
