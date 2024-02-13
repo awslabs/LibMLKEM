@@ -405,13 +405,19 @@ is
    -----------------------------------------
 
    function "+" (Left, Right : in NTT_Poly_Zq) return NTT_Poly_Zq
-     with No_Inline
+     with No_Inline,
+          Post => (for all I in Index_256 => "+"'Result (I) = (Left (I) + Right (I)));
+
+   function "+" (Left, Right : in NTT_Poly_Zq) return NTT_Poly_Zq
    is
-      R : NTT_Poly_Zq;
+      R : NTT_Poly_Zq with Relaxed_Initialization;
    begin
       for I in R'Range loop
          R (I) := Left (I) + Right (I); -- implicitly mod Q
+         pragma Loop_Invariant
+            (for all K in Index_256 range 0 .. I => R (K)'Initialized and then R (K) = (Left (K) + Right (K)));
       end loop;
+
       return R;
    end "+";
 
@@ -1662,9 +1668,10 @@ is
             A1    : constant Zq.T := F (2 * I + 1);
             B0    : constant Zq.T := G (2 * I);
             B1    : constant Zq.T := G (2 * I + 1);
-            Gamma : constant Zq.T   := Gamma_Table (I);
+            Gamma : constant Zq.T := Gamma_Table (I);
+            B1G   : constant Zq.T := B1 * Gamma;
          begin
-            H (2 * I)     := (A0 * B0) + (A1 * B1 * Gamma);
+            H (2 * I)     := (A0 * B0) + (A1 * B1G);
             H (2 * I + 1) := (A0 * B1) + (A1 * B0);
          end;
       end loop;
