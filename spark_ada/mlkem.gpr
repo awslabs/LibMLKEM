@@ -139,7 +139,7 @@ library project MLKEM is
         Contracts_Switches &
         Coverage_Checks_Switches &
         ("-fstack-usage") &
-        ("-fno-tree-dse") & -- workaround DSE bug in AArch64/macOS GCC
+        ("-fno-tree-dse") & -- workaround DSE bug GCC 13. AdaCore tracking number CS0038436
         ("-ffunction-sections") & -- Create a linker section for each function
         ("-fdata-sections") &    -- Create a linker section for each data area
         ("-gnatQ");    -- Don't quit. Generate ALI and tree files even if illegalities
