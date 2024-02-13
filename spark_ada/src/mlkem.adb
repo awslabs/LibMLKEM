@@ -7,6 +7,49 @@ with SHAKE; use SHAKE;
 package body MLKEM
   with SPARK_Mode => On
 is
+   --==============================================================================
+   --  Notation, Naming and Operators
+   --==============================================================================
+   --
+   --  This section lays out a few notational conventions for readers
+   --  that might not be familiar with Ada or SPARK, and notes a few
+   --  important differences between the notation used in FIPS 203 and
+   --  that appearing here.
+   --
+   --  Assignment and Equality
+   --  -----------------------
+   --
+   --  As in Pascal, SPARK uses ":=" for assignment and "=" for equality.
+   --  The latter is predefined for most types, and always returns the predefined
+   --  Boolean type. The "not equals" operator is denoted "/="
+   --
+   --  Concatenation
+   --  -------------
+   --
+   --  FIPS 203 uses "||" for concatenation of sequences and/or arrays.
+   --  In SPARK, all one-dimensional arrays have a predefined concatentation
+   --  index operator, denoted "&".
+   --
+   --  Ranges and Array Slices
+   --  -----------------------
+   --
+   --  Ranges of integers in SPARK (denoted "X .. Y") are _inclusive_
+   --  at both ends. Similarly a "slice" of an array object, denoted
+   --  A (X .. Y), is all the elements of A from the A'th to the Y'th
+   --  element inclusive.
+   --
+   --  Naming
+   --  ------
+   --
+   --  Where FIPS 203 uses accented characters such as the UNICODE code-point
+   --  "Latin Capital A with Circumflex", this code uses a suffix on a simple
+   --  name (e.g. "A_Hat" in this case) and sticks to the simple Latin_1 subset
+   --  of the character set. Other than that, the code maintains the names of all
+   --  types and variables from FIPS 203.
+   --==============================================================================
+
+
+
    --  GNATProve generates false-alarms for the gnatwa.t warning ("suspicious contracts")
    --  when instantiating generics owing to a defect in the compiler front-end in
    --  GNAT versions up to and including 13.1.0. This problem will be corrected in GNAT Pro 25.0
