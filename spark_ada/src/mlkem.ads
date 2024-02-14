@@ -131,7 +131,7 @@ private
    --  which operators ("+", "-", "*" etc) are available for it, and how
    --  they are implemented.
    --
-   --  This package is declared here, so it is visisble to the public
+   --  This package is declared here, so it is visible to the public
    --  child package MLKEM.Tests
    package Zq
      with SPARK_Mode => On
