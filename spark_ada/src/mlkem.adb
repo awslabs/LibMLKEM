@@ -1772,41 +1772,71 @@ is
 
    --  Generating the A_Hat matrix is common to K_PKE_KeyGen and
    --  K_PKE_Encrypt, so is factored out here
-   function Generate_A_Hat_Matrix (Rho : in Bytes_32) return NTT_Poly_Matrix
-     with No_Inline
+   procedure Generate_A_Hat_Matrix (Rho   : in     Bytes_32;
+                                    A_Hat :    out NTT_Poly_Matrix)
+     with Relaxed_Initialization => A_Hat,
+          Post => A_Hat'Initialized
    is
-      R : NTT_Poly_Matrix with Relaxed_Initialization;
    begin
-      --  In order to avoid a double-initialization of R, we prove
-      --  safe initialization of R by proof here, rather than using
-      --  the PDG flow-analysis engine.  Therefore, R is marked
+      --  In order to avoid a double-initialization of A_Hat, we prove
+      --  safe initialization of A_Hat by proof here, rather than using
+      --  the PDG flow-analysis engine.  Therefore, A_Hat is marked
       --  with the "Relaxed_Initialization" aspect, and loop
       --  invariants are used to track initialization of each slice
-      --  and element of R.
+      --  and element of A_Hat.
       for I in K_Range loop
          for J in K_Range loop
-            R (I) (J) := XOF_Then_SampleNTT (Rho, Byte (J), Byte (I));
+            A_Hat (I) (J) := XOF_Then_SampleNTT (Rho, Byte (J), Byte (I));
 
             --  The first I-1 slices of R are fully initialized and
             --  the first J elements of slice I are initialized
-            pragma Loop_Invariant (R (K_Range'First .. I - 1)'Initialized and
-                                   R (I) (K_Range'First .. J)'Initialized);
+            pragma Loop_Invariant (A_Hat (K_Range'First .. I - 1)'Initialized and
+                                   A_Hat (I) (K_Range'First .. J)'Initialized);
 
          end loop;
 
-         --  The first I slices of R are fully initialized
-         pragma Loop_Invariant (R (K_Range'First .. I)'Initialized);
+         --  The first I slices of A_Hat are fully initialized
+         pragma Loop_Invariant (A_Hat (K_Range'First .. I)'Initialized);
 
       end loop;
 
       --  All slices of R are now initialized...
-      pragma Assert (R (K_Range'First .. K_Range'Last)'Initialized);
-
+      pragma Assert (A_Hat (K_Range'First .. K_Range'Last)'Initialized);
       --  ...and therefore
-      pragma Assert (R'Initialized);
-
-      return R;
+      pragma Assert (A_Hat'Initialized);
    end Generate_A_Hat_Matrix;
+
+   --  Generating a Poly_Zq_Vector with Eta_1 is common to K_PKE_KeyGen and
+   --  K_PKE_Encrypt, so is factored out here
+   procedure Generate_Poly_Zq_Vector_With_Eta_1
+      (Sigma     : in     Bytes_32;
+       Initial_N : in     Byte;
+       V         :    out Poly_Zq_Vector)
+     with Pre => Initial_N = 0 or Initial_N = K
+   is
+      N : Byte := Initial_N;
+   begin
+      for I in K_Range loop
+         pragma Loop_Invariant (N = Initial_N + Byte (I));
+         V (I) := SamplePolyCBD_Eta_1 (PRF_Eta_1 (Sigma, N));
+         N := N + 1;
+      end loop;
+   end Generate_Poly_Zq_Vector_With_Eta_1;
+
+   --  Generating a Poly_Zq_Vector with Eta_2 is common to K_PKE_KeyGen and
+   --  K_PKE_Encrypt, so is factored out here
+   procedure Generate_Poly_Zq_Vector_With_Eta_2
+      (Sigma     : in     Bytes_32;
+       V         :    out Poly_Zq_Vector)
+   is
+      N : Byte := K;
+   begin
+      for I in K_Range loop
+         pragma Loop_Invariant (N = K + Byte (I));
+         V (I) := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Sigma, N));
+         N := N + 1;
+      end loop;
+   end Generate_Poly_Zq_Vector_With_Eta_2;
 
    --  Algorithm 12, FIPS 203 5.1
    function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
@@ -1816,7 +1846,6 @@ is
       Rho    : constant Bytes_32 := D_Hash (0 .. 31);
       Sigma  : constant Bytes_32 := D_Hash (32 .. 63);
 
-      N      : Byte := 0;
       A_Hat  : NTT_Poly_Matrix;
       S      : Poly_Zq_Vector;
       E      : Poly_Zq_Vector;
@@ -1826,23 +1855,9 @@ is
       EK     : PKE_Encryption_Key;
       DK     : PKE_Decryption_Key;
    begin
-      A_Hat := Generate_A_Hat_Matrix (Rho);
-
-      for I in K_Range loop
-         pragma Loop_Invariant (N = Byte (I));
-         S (I) := SamplePolyCBD_Eta_1 (PRF_Eta_1 (Sigma, N));
-         N := N + 1;
-      end loop;
-
-      pragma Assert (N = K);
-
-      for I in K_Range loop
-         pragma Loop_Invariant (N = K + Byte (I));
-         E (I) := SamplePolyCBD_Eta_1 (PRF_Eta_1 (Sigma, N));
-         N := N + 1;
-      end loop;
-
-      pragma Assert (N = K * 2);
+      Generate_A_Hat_Matrix (Rho, A_Hat);
+      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, 0, S);
+      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, K, E);
 
       S_Hat := NTT (S);
       E_Hat := NTT (E);
@@ -1861,7 +1876,6 @@ is
                            Random_R : in Bytes_32) return Ciphertext
      with No_Inline
    is
-      N     : Byte := 0;
       A_Hat : NTT_Poly_Matrix;
 
       R, E1, U     : Poly_Zq_Vector;
@@ -1875,28 +1889,11 @@ is
       T_Hat := ByteDecode12 (EK_PKE (0 .. 384 * K - 1));
       Rho := EK_PKE (384 * K .. EK_PKE'Last); --  Should be exactly 32 bytes
 
-      --  Regenerate A_Hat
-      A_Hat := Generate_A_Hat_Matrix (Rho);
+      Generate_A_Hat_Matrix (Rho, A_Hat);
+      Generate_Poly_Zq_Vector_With_Eta_1 (Random_R, 0, R);
+      Generate_Poly_Zq_Vector_With_Eta_2 (Random_R, E1);
 
-      --  Generate R
-      for I in K_Range loop
-         pragma Loop_Invariant (N = Byte (I));
-         R (I) := SamplePolyCBD_Eta_1 (PRF_Eta_1 (Random_R, N));
-         N := N + 1;
-      end loop;
-
-      pragma Assert (N = K);
-
-      --  Generate E1
-      for I in K_Range loop
-         pragma Loop_Invariant (N = K + Byte (I));
-         E1 (I) := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, N));
-         N := N + 1;
-      end loop;
-
-      pragma Assert (N = K * 2);
-
-      E2 := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, N));
+      E2 := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, K * 2));
       R_Hat := NTT (R);
 
       U := NTT_Inv (Transpose (A_Hat) * R_Hat) + E1;
