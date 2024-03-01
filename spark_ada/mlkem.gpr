@@ -18,11 +18,14 @@ library project MLKEM is
    for Library_Kind use Library_Type;
 
    type Enabled_Kind is ("enabled", "disabled");
-   Compile_Checks : Enabled_Kind := External ("MLKEM_COMPILE_CHECKS", "enabled");
-   Runtime_Checks : Enabled_Kind := External ("MLKEM_RUNTIME_CHECKS", "enabled");
-   Style_Checks : Enabled_Kind := External ("MLKEM_STYLE_CHECKS", "enabled");
+   Compile_Checks   : Enabled_Kind := External ("MLKEM_COMPILE_CHECKS", "enabled");
+   Runtime_Checks   : Enabled_Kind := External ("MLKEM_RUNTIME_CHECKS", "enabled");
+   Style_Checks     : Enabled_Kind := External ("MLKEM_STYLE_CHECKS", "enabled");
    Contracts_Checks : Enabled_Kind := External ("MLKEM_CONTRACTS", "enabled");
-   Coverage_Checks : Enabled_Kind := External ("MLKEM_COVERAGE", "disabled");
+   Coverage_Checks  : Enabled_Kind := External ("MLKEM_COVERAGE", "disabled");
+
+   type Concurrency_Kind is ("sequential", "parallel_3", "parallel_all");
+   Concurrency_Option : Concurrency_Kind := External ("MLKEM_CONCURRENCY", "sequential");
 
    type Build_Kind is ("debug", "O1", "O2", "O3", "Os", "Og");
    Build_Mode : Build_Kind := External ("MLKEM_BUILD_MODE", "debug");
@@ -128,6 +131,17 @@ library project MLKEM is
       when others =>
          null;
    end case;
+
+   package Naming is
+      case Concurrency_Option is
+         when "sequential" =>
+            for Body ("MLKEM.K_PKE_KeyGen") use "mlkem-k_pke_keygen.adb";
+         when "parallel_3" =>
+            for Body ("MLKEM.K_PKE_KeyGen") use "mlkem-k_pke_keygen_par.adb";
+         when "parallel_all" =>
+            for Body ("MLKEM.K_PKE_KeyGen") use "mlkem-k_pke_keygen_par.adb";
+      end case;
+   end Naming;
 
    package Compiler is
       for Default_Switches ("Ada") use

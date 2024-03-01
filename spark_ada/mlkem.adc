@@ -2,7 +2,6 @@
 --  SPDX-License-Identifier: Apache-2.0
 
 --  Partition-wide restrictions
-pragma Restriction_Warnings (No_Tasking);
 pragma Restriction_Warnings (No_Allocators);
 pragma Restriction_Warnings (No_Anonymous_Allocators);
 pragma Restriction_Warnings (No_Delay);
