@@ -1840,41 +1840,12 @@ is
 
    --  Algorithm 12, FIPS 203 5.1
    function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
-     with No_Inline
-   is
-      D_Hash : constant Bytes_64 := G (Random_D);
-      Rho    : constant Bytes_32 := D_Hash (0 .. 31);
-      Sigma  : constant Bytes_32 := D_Hash (32 .. 63);
-
-      A_Hat  : NTT_Poly_Matrix;
-      S      : Poly_Zq_Vector;
-      E      : Poly_Zq_Vector;
-      S_Hat  : NTT_Poly_Zq_Vector;
-      E_Hat  : NTT_Poly_Zq_Vector;
-      T_Hat  : NTT_Poly_Zq_Vector;
-      EK     : PKE_Encryption_Key;
-      DK     : PKE_Decryption_Key;
-   begin
-      Generate_A_Hat_Matrix (Rho, A_Hat);
-      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, 0, S);
-      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, K, E);
-
-      S_Hat := NTT (S);
-      E_Hat := NTT (E);
-
-      T_Hat := A_Hat * S_Hat + E_Hat;
-
-      EK := ByteEncode12 (T_Hat) & Rho; --  calls _memcpy()
-      DK := ByteEncode12 (S_Hat);
-
-      return PKE_Key'(EK, DK); --  calls _memcpy() (twice)
-   end K_PKE_KeyGen;
+     is separate;
 
    --  Algorithm 13, FIPS 203 5.2
    function K_PKE_Encrypt (EK_PKE   : in PKE_Encryption_Key;
                            M        : in Bytes_32;
                            Random_R : in Bytes_32) return Ciphertext
-     with No_Inline
    is
       A_Hat : NTT_Poly_Matrix;
 
