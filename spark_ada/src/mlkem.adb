@@ -365,7 +365,7 @@ is
    type UDV is mod 2**DV
      with Object_Size => 16;
 
-   type Poly_U1  is array (Index_256) of U8_Bit;
+   type Poly_U1  is new Bit_Seq (Index_256);
    type Poly_UDU is array (Index_256) of UDU;
    type Poly_UDV is array (Index_256) of UDV;
 
