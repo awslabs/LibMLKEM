@@ -365,7 +365,6 @@ is
    type UDV is mod 2**DV
      with Object_Size => 16;
 
-   type Poly_U1  is new Bit_Seq (Index_256);
    type Poly_UDU is array (Index_256) of UDU;
    type Poly_UDV is array (Index_256) of UDV;
 
@@ -667,10 +666,10 @@ is
       return U8_Bit (T);
    end Compress1;
 
-   function Compress1 (X : in Poly_Zq) return Poly_U1
+   function Compress1 (X : in Poly_Zq) return Bits_256
      with No_Inline
    is
-      R : Poly_U1;
+      R : Bits_256;
    begin
       for I in X'Range loop
          R (I) := Compress1 (X (I));
@@ -856,13 +855,13 @@ is
    -------------------------------------------------------
 
    --  256 1-bit digits is 256 bits, which is 32 bytes
-   function ByteEncode1 (F : in Poly_U1) return Bytes_32
+   function ByteEncode1 (F : in Bits_256) return Bytes_32
      with No_Inline
    is
       function BitsToBytes is new Generic_BitsToBytes
         (Index_256, Bits_256, Index_32, Bytes_32);
    begin
-      return BitsToBytes (Bits_256 (F));
+      return BitsToBytes (F);
    end ByteEncode1;
 
    function ByteEncodeDV (F : in Poly_UDV) return Bytes_UDV
