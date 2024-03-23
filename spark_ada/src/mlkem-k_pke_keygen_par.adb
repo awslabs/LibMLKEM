@@ -22,35 +22,40 @@ is
    EK     : PKE_Encryption_Key;
    DK     : PKE_Decryption_Key;
 
+   task type Compute_A_Hat;
+   task type Compute_S_Hat;
+   task type Compute_E_Hat;
+
+   task body Compute_A_Hat
+   is
+   begin
+      Rho     := D_Hash (0 .. 31);
+      Generate_A_Hat_Matrix (Rho, A_Hat);
+   end Compute_A_Hat;
+
+   task body Compute_S_Hat
+   is
+   begin
+      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, 0, S);
+      S_Hat := NTT (S);
+   end Compute_S_Hat;
+
+   task body Compute_E_Hat
+   is
+   begin
+      Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, K, E);
+      E_Hat := NTT (E);
+   end Compute_E_Hat;
+
 begin
+
    D_Hash := G (Random_D);
    Sigma  := D_Hash (32 .. 63);
 
    declare
-      task Compute_A_Hat;
-      task Compute_S_Hat;
-      task Compute_E_Hat;
-
-      task body Compute_A_Hat
-      is
-      begin
-         Rho := D_Hash (0 .. 31);
-         Generate_A_Hat_Matrix (Rho, A_Hat);
-      end Compute_A_Hat;
-
-      task body Compute_S_Hat
-      is
-      begin
-         Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, 0, S);
-         S_Hat := NTT (S);
-      end Compute_S_Hat;
-
-      task body Compute_E_Hat
-      is
-      begin
-         Generate_Poly_Zq_Vector_With_Eta_1 (Sigma, K, E);
-         E_Hat := NTT (E);
-      end Compute_E_Hat;
+      T1 : Compute_A_Hat;
+      T2 : Compute_S_Hat;
+      T3 : Compute_E_Hat;
    begin
       null;
       --  Original task waits here until the three sub-tasks above
