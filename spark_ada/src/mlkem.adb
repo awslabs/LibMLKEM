@@ -1990,35 +1990,34 @@ is
 
       Result : Bytes_32;
 
-      --  Constant time conditional swap of P and Q.
+      --  Constant time conditional swap of Result and K_Bar.
       --  For illustration, this procedure is proven correct
       --  with the following Contract_Cases postcondition.
-      procedure CSwap (P    : in out Bytes_32;
-                       Q    : in out Bytes_32;
-                       Swap : in     Boolean)
-        with Global => null,
+      procedure CSwap (Swap : in Boolean)
+        with Global => (In_Out => (Result, K_Bar)),
+             No_Inline,
              Contract_Cases =>
-               (Swap     => (P = Q'Old and Q = P'Old),
-                not Swap => (P = P'Old and Q = Q'Old))
+               (Swap     => (K_Bar = Result'Old and Result = K_Bar'Old),
+                not Swap => (K_Bar = K_Bar'Old  and Result = Result'Old))
       is
          -- Conditional swap from Hacker's Delight 2-19
          T : Byte;
          C : constant Byte := 16#FF# * Boolean'Pos (Swap);
       begin
          for I in Index_32 loop
-            T := C and (P (I) xor Q (I));
-            P (I) := P (I) xor T;
-            Q (I) := Q (I) xor T;
+            T := C and (K_Bar (I) xor Result (I));
+            K_Bar (I) := K_Bar (I) xor T;
+            Result (I) := Result (I) xor T;
 
             pragma Loop_Invariant
               (if Swap then
                  (for all J in Index_32 range 0 .. I =>
-                      (P (J) = Q'Loop_Entry (J) and
-                       Q (J) = P'Loop_Entry (J)))
+                      (K_Bar (J) = Result'Loop_Entry (J) and
+                       Result (J) = K_Bar'Loop_Entry (J)))
                else
                  (for all J in Index_32 range 0 .. I =>
-                      (P (J) = P'Loop_Entry (J) and
-                       Q (J) = Q'Loop_Entry (J)))
+                      (K_Bar (J) = K_Bar'Loop_Entry (J) and
+                       Result (J) = Result'Loop_Entry (J)))
               );
          end loop;
       end CSwap;
@@ -2041,7 +2040,7 @@ is
       --  if C /= C_Tick then swap K_Bar into Result.
       --  This fulfills the FIPS-203 spec for implicit rejection
       --  but does so in constant time.
-      CSwap (Result, K_Bar, not Byte_Seq_Equal (C, C_Tick));
+      CSwap (not Byte_Seq_Equal (C, C_Tick));
 
       pragma Unreferenced (K_Bar);
       return Result;
