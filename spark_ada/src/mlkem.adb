@@ -457,7 +457,8 @@ is
       for I in R'Range loop
          R (I) := Left (I) + Right (I); -- implicitly mod Q
          pragma Loop_Invariant
-            (for all K in Index_256 range 0 .. I => R (K)'Initialized and then R (K) = (Left (K) + Right (K)));
+            (for all K in Index_256 range 0 .. I => R (K)'Initialized and then
+                                                    R (K) = (Left (K) + Right (K)));
       end loop;
 
       return R;
@@ -1906,20 +1907,29 @@ is
    --  Constant time equality test for unconstrained Byte_Seq's, where
    --  bounds match exactly.
    function Byte_Seq_Equal (X, Y : in Byte_Seq) return Boolean
-     with Global => null,
+     with No_Inline,
+          Global => null,
           Pre    => X'First = Y'First and
-                    X'Last  = Y'Last,
+                    X'Last  = Y'Last and
+                    X'Length >= 1 and
+                    Y'Length >= 1 and
+                    X'Length = Y'Length,
           Post   => Byte_Seq_Equal'Result =
                       (for all I in X'Range => X (I) = Y (I))
    is
       D : Boolean := True;
+      I : N32 := X'First;
    begin
-      for I in X'Range loop
+      --  Explicit loop statement here to avoid dead branch that
+      --  a "for" loop generates when X'Length = 0
+      loop
          D := D and (X (I) = Y (I));
          pragma Loop_Invariant
-           (D = (for all J in N32 range X'First .. I => X (J) = Y (J)));
+           (I >= X'First and I <= X'Last and
+            (D = (for all J in N32 range X'First .. I => X (J) = Y (J))));
+         exit when I = X'Last;
+         I := I + 1;
       end loop;
-
       return D;
    end Byte_Seq_Equal;
 
