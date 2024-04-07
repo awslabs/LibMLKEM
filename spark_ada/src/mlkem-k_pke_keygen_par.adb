@@ -5,6 +5,8 @@
 --  of A_Hat, S_Hat, and E_Hat
 -----------------------------------------------------------
 
+with Interfaces.C;
+pragma Unreferenced (Interfaces.C);
 separate (MLKEM)
 --  Algorithm 12, FIPS 203 5.1
 function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
