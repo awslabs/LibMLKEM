@@ -1,6 +1,6 @@
 package body P
 is
-   function Div1 (X : in U32) return U32
+   function Div1 (X : in Zq_Product) return U32
    is
    begin
       --  Allow the compiler to implement as it sees fit.

@@ -11,7 +11,7 @@ is
 
    subtype Zq_Product is U32 range 0 .. (Q - 1)**2;
 
-   function Div1 (X : in U32) return U32;
+   function Div1 (X : in Zq_Product) return U32;
 
    function Div2 (X : in Zq_Product) return U32;
 
