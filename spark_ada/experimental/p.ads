@@ -15,4 +15,7 @@ is
 
    function Div2 (X : in Zq_Product) return U32;
 
+   function Negate (X : in Zq) return Zq
+     with Post => (Negate'Result = -X);
+
 end P;

@@ -25,4 +25,18 @@ is
       return U32 (T);
    end Div2;
 
+   function Negate (X : in Zq) return Zq
+   is
+      R : U32;
+   begin
+      --  This generates 4 instructions (5 including the "ret")
+      --  with -O3 -gnatp
+      R := Q - U32 (X);
+      R := R * (Boolean'Pos (R /= Q));
+      return Zq (R);
+
+      --  This generates 6 instructions including the "ret" with same switches.
+      --  return -X;
+   end Negate;
+
 end P;
