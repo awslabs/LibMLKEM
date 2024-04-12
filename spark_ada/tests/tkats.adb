@@ -3,6 +3,7 @@
 
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.IO_Exceptions;
+with Ada.Command_Line; use Ada.Command_Line;
 
 with GNAT.IO_Aux; use GNAT.IO_Aux;
 
@@ -237,7 +238,13 @@ is
 
    end Run_KAT;
 
+   Run_Once : Boolean := False;
+
 begin
+   if Argument_Count = 1 and then Argument (1) = "-f" then
+      Run_Once := True;
+   end if;
+
    if File_Exists (FN) then
       Open (FH, In_File, FN);
 
@@ -245,6 +252,7 @@ begin
          Read_KAT;
          exit when EOF;
          Run_KAT;
+         exit when Run_Once;
       end loop;
 
       Close (FH);

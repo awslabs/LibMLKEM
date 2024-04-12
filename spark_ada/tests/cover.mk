@@ -8,7 +8,7 @@ diff: new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp
 
 new.txt: tkats
 	@echo "--- Running tkats ---"
-	./tkats >$@
+	./tkats -f >$@
 
 cover_results: new.txt
 	gcov tkats.adb
