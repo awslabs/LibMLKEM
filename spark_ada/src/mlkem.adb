@@ -950,7 +950,8 @@ is
        U16 (X (9)) * 512 +
        U16 (X (10)) * 1024 +
        U16 (X (11)) * 2048)
-     with Post => Bits_12_To_U16'Result < 4096;
+     with Ghost,
+          Post => Bits_12_To_U16'Result < 4096;
 
    function Zq_To_Bits_12 (X : in Zq.T) return Bits_12
      with Post => Bits_12_To_U16 (Zq_To_Bits_12'Result) < Q
@@ -1915,7 +1916,9 @@ is
                     Y'Length >= 1 and
                     X'Length = Y'Length,
           Post   => Byte_Seq_Equal'Result =
-                      (for all I in X'Range => X (I) = Y (I))
+                      (for all I in X'Range => X (I) = Y (I));
+
+   function Byte_Seq_Equal (X, Y : in Byte_Seq) return Boolean
    is
       D : Boolean := True;
       I : N32 := X'First;
@@ -2008,7 +2011,9 @@ is
              No_Inline,
              Contract_Cases =>
                (Swap     => (K_Bar = Result'Old and Result = K_Bar'Old),
-                not Swap => (K_Bar = K_Bar'Old  and Result = Result'Old))
+                not Swap => (K_Bar = K_Bar'Old  and Result = Result'Old));
+
+      procedure CSwap (Swap : in Boolean)
       is
          -- Conditional swap from Hacker's Delight 2-19
          T : Byte;
