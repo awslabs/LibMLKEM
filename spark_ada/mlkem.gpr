@@ -172,11 +172,11 @@ library project MLKEM is
                                       "--no-inlining",
                                       "--no-loop-unrolling",
                                       "--level=1",
-                                      "--prover=z3,cvc4,altergo",
+                                      "--prover=z3,cvc5,altergo",
                                       "--timeout=4",
                                       "--memlimit=0",
                                       "--steps=25000",
-                                      "--report=statistics");
+                                      "--report=fail");
    end Prove;
 
 
