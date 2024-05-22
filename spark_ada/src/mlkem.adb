@@ -1611,6 +1611,7 @@ is
          pragma Loop_Invariant (2**(I + 1) <= 128);
          pragma Loop_Invariant (I32 (K) = 2**(I + 1));
       end loop;
+
       pragma Assert (I32 (K) = 128);
       pragma Assert (K = 128);
       return F_Hat; --  calls _memcpy()
