@@ -176,7 +176,7 @@ library project MLKEM is
                                       "--timeout=4",
                                       "--memlimit=0",
                                       "--steps=25000",
-                                      "--report=fail");
+                                      "--report=statistics");
    end Prove;
 
 
