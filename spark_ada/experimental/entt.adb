@@ -395,12 +395,11 @@ is
       Zeta : constant Zq := Zeta_ExpC (K);
       T    : constant This_Poly := CT_Butterfly (F, Zeta);
    begin
-      if T'Length = 4 then
-         return T;
-      else
-         return NTTsrl (Half_Poly (T   (0 .. Len - 1)), K * 2) &
-                NTTsrl (Half_Poly (T (Len .. T'Last)),  K * 2 + 1);
-      end if;
+      return (if T'Length = 4 then
+                 T
+              else
+                 NTTsrl (Half_Poly (T   (0 .. Len - 1)), K * 2) &
+                 NTTsrl (Half_Poly (T (Len .. T'Last)),  K * 2 + 1));
    end NTTsrl;
 
 
