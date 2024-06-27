@@ -7,11 +7,12 @@ begin
    P1 := (others => 5);
 
 
-   for I in 1 .. 1000 loop
-      P3 := P1;
+   for I in 1 .. 100_000 loop
+--      P3 := P1;
 
       P2 := NTT (P1);
-      NTTir (P3);
+      P3 := NTTsr (P1);
+--      NTTir (P3);
 
       if P2 = P3 then
          null;

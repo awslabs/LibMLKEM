@@ -155,7 +155,8 @@ is
                          Zeta  : in     Zq;
                          Start : in     Index_256;
                          Len   : in     Len_T)
-       with Global => null,
+       with No_Inline,
+            Global => null,
             Pre    => Start <= 252 and
                       Start + 2 * Len <= 256
    is
@@ -168,6 +169,21 @@ is
          F_Hat (J)       := F_Hat (J) + T;
       end loop;
    end NTTu_Inner;
+
+   --  As above, but with Start => 0, Len => 128, Zeta => 1729
+   procedure NTT128_Inner (F_Hat : in out Poly_Zq)
+       with No_Inline,
+            Global => null
+   is
+      T : Zq;
+   begin
+      for J in Index_256 range 0 .. 127 loop
+         pragma Loop_Optimize (Ivdep, Vector);
+         T               := 1729 * F_Hat (J + 128);
+         F_Hat (J + 128) := F_Hat (J) - T;
+         F_Hat (J)       := F_Hat (J) + T;
+      end loop;
+   end NTT128_Inner;
 
    function NTT (F : in Poly_Zq) return Poly_Zq
      with SPARK_Mode => Off
@@ -249,10 +265,11 @@ is
 
       -- I = 0 -----------------
 --      for J in I32 range 0 .. 0 loop
-      NTTu_Inner (F_Hat => F_Hat,
-                  Zeta  => Zeta_ExpC (1),
-                  Start => 0,
-                  Len   => 128);
+      NTT128_Inner (F_Hat);
+--      NTTu_Inner (F_Hat => F_Hat,
+--                  Zeta  => Zeta_ExpC (1),
+--                  Start => 0,
+--                  Len   => 128);
 --      end loop;
       -- I = 1 -----------------
 --      for J in I32 range 0 .. 1 loop
@@ -329,36 +346,60 @@ is
    function NTTsrl (F : in UPoly;
                     K : in SU7) return UPoly
    is
-      --  Take a mutable copy of F
-      T   : UPoly (F'Range) := F;
+      subtype This_Poly is UPoly (F'Range);
 
-      --  Length and subtype for each half of T
-      Len : constant Len_T := T'Length / 2;
+      --  Length and subtype for each half of F
+      Len : constant Len_T := F'Length / 2;
+      pragma Assert (Len * 2 = F'Length);
       subtype Half_Poly is UPoly (0 .. Len - 1);
-      Zeta : constant Zq := Zeta_ExpC (K);
-      Tmp : Zq;
-   begin
-      for J in Index_256 range 0 .. Len - 1 loop
-         Tmp         := Zeta * T (J + Len);
-         T (J + Len) := T (J) - Tmp;
-         T (J)       := T (J) + Tmp;
-      end loop;
 
-      if F'Length = 4 then
+      function CT_Lowerhalf (T    : in This_Poly;
+                             Zeta : in Zq) return Half_Poly
+        with Global => (Input => Len,
+                        Proof_In => F),
+             Pre    => T'First = 0
+      is
+         R : Half_Poly;
+      begin
+         for I in R'Range loop
+            R (I) := T (I) + Zeta * T (I + Len);
+         end loop;
+         return R;
+      end CT_Lowerhalf;
+
+      function CT_Upperhalf (T    : in This_Poly;
+                             Zeta : in Zq) return Half_Poly
+        with Global => (Input    => Len,
+                        Proof_In => F),
+             Pre    => T'First = 0
+      is
+         R : Half_Poly;
+      begin
+         for J in R'Range loop
+            R (J) := T (J) - Zeta * T (J + Len);
+         end loop;
+         return R;
+      end CT_Upperhalf;
+
+      function CT_Butterfly (T    : in This_Poly;
+                             Zeta : in Zq) return This_Poly
+        with Global => (Input    => Len,
+                        Proof_In => F),
+             Pre    => T'First = 0 and
+                       T'Length in NTT_Slice_Length
+      is
+      begin
+         return CT_Lowerhalf (T, Zeta) & CT_Upperhalf (T, Zeta);
+      end CT_Butterfly;
+
+      Zeta : constant Zq := Zeta_ExpC (K);
+      T    : constant This_Poly := CT_Butterfly (F, Zeta);
+   begin
+      if T'Length = 4 then
          return T;
       else
-         declare
-            --  Recurse to compute lower-half NTT first
-            LH     : constant Half_Poly := Half_Poly (T  (0 .. Len - 1));
-            NTT_LH : constant Half_Poly := NTTsrl (LH, K * 2);
-
-            --  then upper-half...
-            UH     : constant Half_Poly := Half_Poly (T (Len .. T'Last));
-            NTT_UH : constant Half_Poly := NTTsrl (UH, K * 2 + 1);
-         begin
-            --  Concatenate the new halves and return
-            return NTT_LH & NTT_UH;
-         end;
+         return NTTsrl (Half_Poly (T   (0 .. Len - 1)), K * 2) &
+                NTTsrl (Half_Poly (T (Len .. T'Last)),  K * 2 + 1);
       end if;
    end NTTsrl;
 
