@@ -13,7 +13,7 @@ coerceSize : {m, n, a} [m]a -> [n]a
 coerceSize xs = [ xs @ i | i <- [0 .. <n] ]
 
 // Simple lookup table for Zeta value given K
-zeta_expc  : [128][16]
+zeta_expc  : [128]Zq
 zeta_expc = [ 1, 1729, 2580, 3289, 2642, 630, 1897, 848,
               1062, 1919, 193, 797, 2786, 3260, 569, 1746,
               296, 2447, 1339, 1476, 3046, 56, 2240, 1333,
@@ -37,11 +37,11 @@ ct_lowerhalf :
     (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
     // Length of v is a member of {256,128,64,32,16,8,4}
     // but returns half that length
-    [2^^p][16] -> [16] -> [2^^q][16]
+    [2^^p]Zq -> Zq -> [2^^q]Zq
 ct_lowerhalf v zeta = new_v
   where
     len = 2 ^^ `q
-    new_v = [ (v@x + (zeta * v@(x + len)) % 3329) | x <- [0 .. (2^^q)-1] ]
+    new_v = [ v@x + (zeta * v@(x + len)) | x <- [0 .. (2^^q)-1] ]
 
 // CT Butterfly on upper half of vector v
 ct_upperhalf :
@@ -49,17 +49,17 @@ ct_upperhalf :
     (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
     // Length of v is a member of {256,128,64,32,16,8,4}
     // but returns half that length
-    [2^^p][16] -> [16] -> [2^^q][16]
+    [2^^p]Zq -> Zq -> [2^^q]Zq
 ct_upperhalf v zeta = new_v
   where
     len = 2 ^^ `q
-    new_v = [ (v@x - (zeta * v@(x + len))) % 3329 | x <- [0 .. (2^^q)-1] ]
+    new_v = [ v@x - (zeta * v@(x + len)) | x <- [0 .. (2^^q)-1] ]
 
 // Single butterfly step
 ct_butterfly :
     {m}
     (m >= 2, m <= 8) =>
-    [2^^m][16] -> [16] -> [2^^m][16]
+    [2^^m]Zq -> Zq -> [2^^m]Zq
 ct_butterfly v zeta = new_v
   where
     lower = ct_lowerhalf`{m,m-1} v zeta
@@ -70,7 +70,7 @@ ct_butterfly v zeta = new_v
 nttl :
     {n}  // Length of v is a member of {256,128,64,32,16,8,4}
     (n >= 2, n <= 8) =>
-    [2^^n][16] -> [16] -> [2^^n][16]
+    [2^^n]Zq -> Zq -> [2^^n]Zq
 nttl v k
   | n == 2 => ct_butterfly`{n} v zeta
                 where zeta = zeta_expc@k
@@ -83,5 +83,5 @@ nttl v k
                   [s0, s1] = split (coerceSize t)
 
 // Top level entry point - start with N=256, K=1
-ntt : [256][16] -> [256][16]
+ntt : Z_q_256 -> Z_q_256
 ntt v = nttl v 1
