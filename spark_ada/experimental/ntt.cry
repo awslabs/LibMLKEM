@@ -41,7 +41,7 @@ ct_lowerhalf :
 ct_lowerhalf v zeta = new_v
   where
     len = 2 ^^ `q
-    new_v = [ v@x + (zeta * v@(x + len)) | x <- [0 .. (2^^q)-1] ]
+    new_v = [ v@x + (zeta * v@(x + len)) | x <- [0 .. <(2^^q)] ]
 
 // CT Butterfly on upper half of vector v
 ct_upperhalf :
@@ -53,7 +53,7 @@ ct_upperhalf :
 ct_upperhalf v zeta = new_v
   where
     len = 2 ^^ `q
-    new_v = [ v@x - (zeta * v@(x + len)) | x <- [0 .. (2^^q)-1] ]
+    new_v = [ v@x - (zeta * v@(x + len)) | x <- [0 .. <(2^^q)] ]
 
 // Single butterfly step
 ct_butterfly :
