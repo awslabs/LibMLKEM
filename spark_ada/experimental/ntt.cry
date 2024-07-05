@@ -1,0 +1,57 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+
+// Experimental attempt to specify fast CT-NTT in Cryptol
+
+// Simple lookup table for Zeta value given K
+zeta_expc  : [128][16]
+zeta_expc = [ 1, 1729, 2580, 3289, 2642, 630, 1897, 848,
+              1062, 1919, 193, 797, 2786, 3260, 569, 1746,
+              296, 2447, 1339, 1476, 3046, 56, 2240, 1333,
+              1426, 2094, 535, 2882, 2393, 2879, 1974, 821,
+              289, 331, 3253, 1756, 1197, 2304, 2277, 2055,
+              650, 1977, 2513, 632, 2865, 33, 1320, 1915,
+              2319, 1435, 807, 452, 1438, 2868, 1534, 2402,
+              2647, 2617, 1481, 648, 2474, 3110, 1227, 910,
+              17, 2761, 583, 2649, 1637, 723, 2288, 1100,
+              1409, 2662, 3281, 233, 756, 2156, 3015, 3050,
+              1703, 1651, 2789, 1789, 1847, 952, 1461, 2687,
+              939, 2308, 2437, 2388, 733, 2337, 268, 641,
+              1584, 2298, 2037, 3220, 375, 2549, 2090, 1645,
+              1063, 319, 2773, 757, 2099, 561, 2466, 2594,
+              2804, 1092, 403, 1026, 1143, 2150, 2775, 886,
+              1722, 1212, 1874, 1029, 2110, 2935, 885, 2154 ]
+
+// Single butterfly step - details TBD
+ct_butterfly :
+    {m}
+    [m][16] -> [16] -> [m][16]
+ct_butterfly v zeta = new_v
+  where
+    new_v = v // TBD
+
+// NTTl
+nttl :
+    {n}
+    (fin n, n >= 2, n <= 8) =>
+    // Length of v is a member of {256,128,64,32,16,8,4}
+    [2^^n][16] -> [16] -> [2^^n][16]
+
+//    This seems to make things worse
+//    (fin n, n >= 2, n <= 8, 2 * 2 ^^ (n - 1) == 2 ^^ n) =>
+
+nttl v k | n == 2 => new_v where zeta = zeta_expc@k
+                                 new_v = ct_butterfly v zeta
+         | n > 2  => new_v where zeta = zeta_expc@k
+                                 t = ct_butterfly v zeta
+                                 // Split t into two halves s0 and s1
+                                 s = split`{parts=2,each=2^^(n-1)} t
+                                 s0 = s@0 : [2^^(n-1)][16]
+                                 s1 = s@1 : [2^^(n-1)][16]
+                                 new_v = ((nttl s0 (k * 2)) #
+                                          (nttl s1 (k * 2 + 1)))
+
+// Top level entry point - start with N=256, K=1
+ntt : [256][16] -> [256][16]
+ntt v = nttl v 1
