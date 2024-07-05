@@ -73,11 +73,11 @@ nttl :
     [2^^n]Zq -> Zq -> [2^^n]Zq
 nttl v k
   | n == 2 => ct_butterfly`{n} v zeta
-                where zeta = zeta_expc@k
+                where zeta = zeta_expc@(fromZ k)
   | n  > 2 => coerceSize ((nttl`{n-1} s0 (k * 2)) #
                           (nttl`{n-1} s1 (k * 2 + 1)))
                 where
-                  zeta = zeta_expc@k
+                  zeta = zeta_expc@(fromZ k)
                   t = ct_butterfly`{n} v zeta
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize t)
