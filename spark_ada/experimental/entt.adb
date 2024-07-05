@@ -1,3 +1,6 @@
+--  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+--  SPDX-License-Identifier: Apache-2.0
+
 with Ada.Text_IO; use Ada.Text_IO;
 package body ENTT
   with SPARK_Mode => On

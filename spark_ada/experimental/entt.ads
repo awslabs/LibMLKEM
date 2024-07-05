@@ -1,3 +1,6 @@
+--  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+--  SPDX-License-Identifier: Apache-2.0
+
 with Interfaces; use Interfaces;
 package ENTT
   with SPARK_Mode => On
