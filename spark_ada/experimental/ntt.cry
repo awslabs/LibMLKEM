@@ -3,6 +3,14 @@
 
 
 // Experimental attempt to specify fast CT-NTT in Cryptol
+type MLKEM_Q = 3329
+type MLKEM_N = 256
+type Zq = (Z MLKEM_Q)
+type Z_q_256 = [MLKEM_N]Zq
+
+
+coerceSize : {m, n, a} [m]a -> [n]a
+coerceSize xs = [ xs @ i | i <- [0 .. <n] ]
 
 // Simple lookup table for Zeta value given K
 zeta_expc  : [128][16]
@@ -23,34 +31,56 @@ zeta_expc = [ 1, 1729, 2580, 3289, 2642, 630, 1897, 848,
               2804, 1092, 403, 1026, 1143, 2150, 2775, 886,
               1722, 1212, 1874, 1029, 2110, 2935, 885, 2154 ]
 
-// Single butterfly step - details TBD
+// CT Butterfly on lower half of vector v
+ct_lowerhalf :
+    {p, q}
+    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
+    // Length of v is a member of {256,128,64,32,16,8,4}
+    // but returns half that length
+    [2^^p][16] -> [16] -> [2^^q][16]
+ct_lowerhalf v zeta = new_v
+  where
+    len = 2 ^^ `q
+    new_v = [ (v@x + (zeta * v@(x + len)) % 3329) | x <- [0 .. (2^^q)-1] ]
+
+// CT Butterfly on upper half of vector v
+ct_upperhalf :
+    {p, q}
+    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
+    // Length of v is a member of {256,128,64,32,16,8,4}
+    // but returns half that length
+    [2^^p][16] -> [16] -> [2^^q][16]
+ct_upperhalf v zeta = new_v
+  where
+    len = 2 ^^ `q
+    new_v = [ (v@x - (zeta * v@(x + len))) % 3329 | x <- [0 .. (2^^q)-1] ]
+
+// Single butterfly step
 ct_butterfly :
     {m}
-    [m][16] -> [16] -> [m][16]
+    (m >= 2, m <= 8) =>
+    [2^^m][16] -> [16] -> [2^^m][16]
 ct_butterfly v zeta = new_v
   where
-    new_v = v // TBD
+    lower = ct_lowerhalf`{m,m-1} v zeta
+    upper = ct_upperhalf`{m,m-1} v zeta
+    new_v = coerceSize (lower # upper)
 
 // NTTl
 nttl :
-    {n}
-    (fin n, n >= 2, n <= 8) =>
-    // Length of v is a member of {256,128,64,32,16,8,4}
+    {n}  // Length of v is a member of {256,128,64,32,16,8,4}
+    (n >= 2, n <= 8) =>
     [2^^n][16] -> [16] -> [2^^n][16]
-
-//    This seems to make things worse
-//    (fin n, n >= 2, n <= 8, 2 * 2 ^^ (n - 1) == 2 ^^ n) =>
-
-nttl v k | n == 2 => new_v where zeta = zeta_expc@k
-                                 new_v = ct_butterfly v zeta
-         | n > 2  => new_v where zeta = zeta_expc@k
-                                 t = ct_butterfly v zeta
-                                 // Split t into two halves s0 and s1
-                                 s = split`{parts=2,each=2^^(n-1)} t
-                                 s0 = s@0 : [2^^(n-1)][16]
-                                 s1 = s@1 : [2^^(n-1)][16]
-                                 new_v = ((nttl s0 (k * 2)) #
-                                          (nttl s1 (k * 2 + 1)))
+nttl v k
+  | n == 2 => ct_butterfly`{n} v zeta
+                where zeta = zeta_expc@k
+  | n  > 2 => coerceSize ((nttl`{n-1} s0 (k * 2)) #
+                          (nttl`{n-1} s1 (k * 2 + 1)))
+                where
+                  zeta = zeta_expc@k
+                  t = ct_butterfly`{n} v zeta
+                  // Split t into two halves s0 and s1
+                  [s0, s1] = split (coerceSize t)
 
 // Top level entry point - start with N=256, K=1
 ntt : [256][16] -> [256][16]
