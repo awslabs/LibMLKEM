@@ -70,14 +70,14 @@ ct_butterfly v zeta = new_v
 nttl :
     {n}  // Length of v is a member of {256,128,64,32,16,8,4}
     (n >= 2, n <= 8) =>
-    [2^^n]Zq -> Zq -> [2^^n]Zq
+    [2^^n]Zq -> [8] -> [2^^n]Zq
 nttl v k
   | n == 2 => ct_butterfly`{n} v zeta
-                where zeta = zeta_expc@(fromZ k)
+                where zeta = zeta_expc@k
   | n  > 2 => coerceSize ((nttl`{n-1} s0 (k * 2)) #
                           (nttl`{n-1} s1 (k * 2 + 1)))
                 where
-                  zeta = zeta_expc@(fromZ k)
+                  zeta = zeta_expc@k
                   t = ct_butterfly`{n} v zeta
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize t)
