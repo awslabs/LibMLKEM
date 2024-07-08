@@ -26,6 +26,10 @@ is
    type UPoly is array (Index_256 range <>) of Zq;
    subtype Poly_Zq is UPoly (Index_256);
 
+   --====================
+   -- NTT
+   --====================
+
    --  Standard CT-based NTT implemented as per FIPS 203
    function NTT (F : in Poly_Zq) return Poly_Zq
      with Global => null,
@@ -51,4 +55,27 @@ is
      with Global => null,
           No_Inline;
 
+   --====================
+   -- Inverse NTT
+   --====================
+
+   -- Standard, GS-based NTT implemented as per FIPS 203
+   function NTT_Inv (F : in Poly_Zq) return Poly_Zq
+     with Global => null,
+          No_Inline;
+
+   --  As per standard, but outer loop unrolled
+   function NTT_Invu (F : in Poly_Zq) return Poly_Zq
+     with Global => null,
+          No_Inline;
+
+   --  Sequential, recursive, in-place procedural interface.
+   procedure NTT_Invir (F : in out Poly_Zq)
+     with Global => null,
+          No_Inline;
+
+   --  Sequential, recursive, functional interface
+   function NTT_Invsr (F : in Poly_Zq) return Poly_Zq
+     with Global => null,
+          No_Inline;
 end ENTT;
