@@ -9,7 +9,7 @@ type Zq = (Z MLKEM_Q)
 type Z_q_256 = [MLKEM_N]Zq
 
 //======================================================
-// Galois section
+// Galois section - from cryptol-specs repository
 //
 // This section:
 //    Copyright (c) 2013-2019 Galois Inc.
@@ -146,9 +146,14 @@ fast_ntt v = fast_nttl v 1
 //
 
 // Properties and proofs
-//property fast_ntt_inverts f =  fast_invntt (fast_ntt f) == f
+//fast_ntt_inverts    : Z_q_256 -> Bit
+//fast_invntt_inverts : Z_q_256 -> Bit
+//property fast_ntt_inverts    f =  fast_invntt (fast_ntt f)    == f
+//property fast_invntt_inverts f =  fast_ntt    (fast_invntt f) == f
 // :prove fast_ntt_inverts - ???
+// :prove fast_invntt_inverts - ???
 
+naive_fast_ntt_equiv : Z_q_256 -> Bit
 property naive_fast_ntt_equiv f =  naive_ntt f == fast_ntt f
 // :check naive_fast_ntt_equiv - OK for 100 test cases
 // :prove naive_fast_ntt_equiv - OK - 5s using Z3
