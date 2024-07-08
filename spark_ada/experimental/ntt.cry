@@ -53,10 +53,6 @@ property naive_invntt_inverts f =  naive_ntt    (naive_invntt f) == f
 //======================================================
 
 
-//======================================================
-// Fast recursive CT-NTT
-//======================================================
-
 coerceSize : {m, n, a} [m]a -> [n]a
 coerceSize xs = [ xs @ i | i <- [0 .. <n] ]
 
@@ -78,6 +74,10 @@ zeta_expc = [ 1, 1729, 2580, 3289, 2642, 630, 1897, 848,
               1063, 319, 2773, 757, 2099, 561, 2466, 2594,
               2804, 1092, 403, 1026, 1143, 2150, 2775, 886,
               1722, 1212, 1874, 1029, 2110, 2935, 885, 2154 ]
+
+//======================================================
+// Fast recursive CT-NTT
+//======================================================
 
 // CT Butterfly on lower half of vector v
 ct_lowerhalf :
@@ -137,23 +137,91 @@ fast_nttl v k
 fast_ntt : Z_q_256 -> Z_q_256
 fast_ntt v = fast_nttl v 1
 
+//======================================================
+// Fast recursive GS-Inverse-NTT
+//======================================================
 
-// Test cases
-//
-// let c = [a | a <- [0 .. 255]] : Z_q_256
-// fast_ntt c
-// naive_ntt c
-//
 
+
+// GS Butterfly on lower half of vector v
+gs_lowerhalf :
+    {p, q}
+    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
+    // Length of v is a member of {256,128,64,32,16,8,4}
+    // but returns half that length
+    [2^^p]Zq -> [2^^q]Zq
+gs_lowerhalf v = new_v
+  where
+    len = 2 ^^ `q
+    new_v = [ v@x + v@(x + len) | x <- [0 .. <(2^^q)]]
+
+// GS Butterfly on upper half of vector v
+gs_upperhalf :
+    {p, q}
+    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
+    // Length of v is a member of {256,128,64,32,16,8,4}
+    // but returns half that length
+    [2^^p]Zq -> Zq -> [2^^q]Zq
+gs_upperhalf v zeta = new_v
+  where
+    len = 2 ^^ `q
+    new_v = [ zeta * (v@(x + len) - v@x) | x <- [0 .. <(2^^q)] ]
+
+// Single butterfly step
+gs_butterfly :
+    {m}
+    (m >= 2, m <= 8) =>
+    [2^^m]Zq -> Zq -> [2^^m]Zq
+gs_butterfly v zeta = new_v
+  where
+    lower = gs_lowerhalf`{m,m-1} v
+    upper = gs_upperhalf`{m,m-1} v zeta
+    new_v = coerceSize (lower # upper)
+
+
+// fast_nttl - local, recursive NTT
+fast_invnttl :
+    {n}  // Length of v is a member of {256,128,64,32,16,8,4}
+    (n >= 2, n <= 8) =>
+    [2^^n]Zq -> [8] -> [2^^n]Zq
+
+fast_invnttl v k
+  // Base case. n==2 so just compute the butterfly and return
+  | n == 2 => gs_butterfly`{n} v (zeta_expc@k)
+
+  // Recursive case. Recurse on each half,
+  // concatenate the results, butterfly that, and return
+  | n  > 2 => gs_butterfly`{n} t (zeta_expc@k)
+                where
+                  // Split t into two halves s0 and s1
+                  [s0, s1] = split (coerceSize v)
+                  t = coerceSize ((fast_invnttl`{n-1} s0 (k * 2 + 1)) #
+                                  (fast_invnttl`{n-1} s1 (k * 2)))
+
+mul_3303 : Z_q_256 -> Z_q_256
+mul_3303 v = [ v@x * 3303 | x <- [0 .. <MLKEM_N] ]
+
+// Top level entry point - start with N=256, K=1
+fast_invntt : Z_q_256 -> Z_q_256
+fast_invntt v = mul_3303 (fast_invnttl v 1)
+
+
+//======================================================
 // Properties and proofs
-//fast_ntt_inverts    : Z_q_256 -> Bit
-//fast_invntt_inverts : Z_q_256 -> Bit
-//property fast_ntt_inverts    f =  fast_invntt (fast_ntt f)    == f
-//property fast_invntt_inverts f =  fast_ntt    (fast_invntt f) == f
-// :prove fast_ntt_inverts - ???
-// :prove fast_invntt_inverts - ???
+//======================================================
+
+fast_ntt_inverts    : Z_q_256 -> Bit
+property fast_ntt_inverts    f =  fast_invntt (fast_ntt f)    == f
+
+fast_invntt_inverts : Z_q_256 -> Bit
+property fast_invntt_inverts f =  fast_ntt    (fast_invntt f) == f
+// :prove fast_ntt_inverts
+// :prove fast_invntt_inverts
 
 naive_fast_ntt_equiv : Z_q_256 -> Bit
 property naive_fast_ntt_equiv f =  naive_ntt f == fast_ntt f
-// :check naive_fast_ntt_equiv - OK for 100 test cases
-// :prove naive_fast_ntt_equiv - OK - 5s using Z3
+// :prove naive_fast_ntt_equiv
+
+naive_fast_invntt_equiv : Z_q_256 -> Bit
+property naive_fast_invntt_equiv f =  naive_invntt f == fast_invntt f
+// :prove naive_fast_invntt_equiv
