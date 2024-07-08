@@ -8,6 +8,54 @@ type MLKEM_N = 256
 type Zq = (Z MLKEM_Q)
 type Z_q_256 = [MLKEM_N]Zq
 
+//======================================================
+// Galois section
+//
+// This section:
+//    Copyright (c) 2013-2019 Galois Inc.
+//    All rights reserved.
+//
+// Modified by rodchap, July 2024 to integrates types
+// and notations with the code below.
+//======================================================
+base_zeta = 17 : Zq
+
+BitRev7 : [8] -> [8]
+BitRev7 = reverse
+
+// This is simple but O(n**2)
+ParametricNTT : Z_q_256 -> Zq -> Z_q_256
+ParametricNTT f root = join[[f2i i, f2iPlus1 i] | i <- [0 .. 127]]
+  where f2i i      = sum [f@(2*j)   * root ^^ ((2*(BitRev7 i >> 1)+1)*j) | j <- [0 .. 127]]
+        f2iPlus1 i = sum [f@(2*j+1) * root ^^ ((2*(BitRev7 i >> 1)+1)*j) | j <- [0 .. 127]]
+
+ParametricNTTInv : Z_q_256 -> Zq -> Z_q_256
+ParametricNTTInv f root = join[[f2i i, f2iPlus1 i] | i <- [0 .. 127]]
+  where f2i i      = sum [f@(2*j)   * root ^^ ((2*(BitRev7 j >> 1)+1)*i) | j <- [0 .. 127]]
+        f2iPlus1 i = sum [f@(2*j+1) * root ^^ ((2*(BitRev7 j >> 1)+1)*i) | j <- [0 .. 127]]
+
+naive_ntt : Z_q_256 -> Z_q_256
+naive_ntt f = ParametricNTT f base_zeta
+
+naive_invntt : Z_q_256 -> Z_q_256
+naive_invntt f = [term*(recip 128) | term <- ParametricNTTInv f (recip base_zeta)]
+
+// Properties and proofs
+naive_ntt_inverts    : Z_q_256 -> Bit
+naive_invntt_inverts : Z_q_256 -> Bit
+property naive_ntt_inverts    f =  naive_invntt (naive_ntt f)    == f
+property naive_invntt_inverts f =  naive_ntt    (naive_invntt f) == f
+// :prove naive_ntt_inverts    - OK using Z3
+// :prove naive_invntt_inverts - OK using Z3
+
+//======================================================
+// End of Galois section
+//======================================================
+
+
+//======================================================
+// Fast recursive CT-NTT
+//======================================================
 
 coerceSize : {m, n, a} [m]a -> [n]a
 coerceSize xs = [ xs @ i | i <- [0 .. <n] ]
@@ -66,22 +114,41 @@ ct_butterfly v zeta = new_v
     upper = ct_upperhalf`{m,m-1} v zeta
     new_v = coerceSize (lower # upper)
 
-// NTTl
-nttl :
+// fast_nttl - local, recursive NTT
+fast_nttl :
     {n}  // Length of v is a member of {256,128,64,32,16,8,4}
     (n >= 2, n <= 8) =>
     [2^^n]Zq -> [8] -> [2^^n]Zq
-nttl v k
-  | n == 2 => ct_butterfly`{n} v zeta
-                where zeta = zeta_expc@k
-  | n  > 2 => coerceSize ((nttl`{n-1} s0 (k * 2)) #
-                          (nttl`{n-1} s1 (k * 2 + 1)))
+fast_nttl v k
+  // Base case. n==2 so just compute the butterfly and return
+  | n == 2 => ct_butterfly`{n} v (zeta_expc@k)
+
+  // Recursive case. Butterfly what we have, then recurse on each half,
+  // concatenate the results and return
+  | n  > 2 => coerceSize ((fast_nttl`{n-1} s0 (k * 2)) #
+                          (fast_nttl`{n-1} s1 (k * 2 + 1)))
                 where
-                  zeta = zeta_expc@k
-                  t = ct_butterfly`{n} v zeta
+                  t = ct_butterfly`{n} v (zeta_expc@k)
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize t)
 
+
 // Top level entry point - start with N=256, K=1
-ntt : Z_q_256 -> Z_q_256
-ntt v = nttl v 1
+fast_ntt : Z_q_256 -> Z_q_256
+fast_ntt v = fast_nttl v 1
+
+
+// Test cases
+//
+// let c = [a | a <- [0 .. 255]] : Z_q_256
+// fast_ntt c
+// naive_ntt c
+//
+
+// Properties and proofs
+//property fast_ntt_inverts f =  fast_invntt (fast_ntt f) == f
+// :prove fast_ntt_inverts - ???
+
+property naive_fast_ntt_equiv f =  naive_ntt f == fast_ntt f
+// :check naive_fast_ntt_equiv - OK for 100 test cases
+// :prove naive_fast_ntt_equiv - OK - 5s using Z3
