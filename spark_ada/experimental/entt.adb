@@ -161,19 +161,19 @@ is
 
    --  Local subprogram declarations
 
-   procedure NTTu_Inner (F_Hat : in out Poly_Zq;
-                         Zeta  : in     Zq;
-                         Start : in     Index_256;
-                         Len   : in     Len_T)
+   procedure NTT_Inner (F_Hat : in out Poly_Zq;
+                        Zeta  : in     Zq;
+                        Start : in     Index_256;
+                        Len   : in     Len_T)
        with No_Inline,
             Global => null,
             Pre    => Start <= 252 and
                       Start + 2 * Len <= 256;
 
-   procedure Atomic_NTTu_Inner (F_Hat : in out Atomic_Poly_Zq;
-                                Zeta  : in     Zq;
-                                Start : in     Index_256;
-                                Len   : in     Len_T)
+   procedure Atomic_NTT_Inner (F_Hat : in out Atomic_Poly_Zq;
+                               Zeta  : in     Zq;
+                               Start : in     Index_256;
+                               Len   : in     Len_T)
        with No_Inline,
             Global => null,
             Pre    => Start <= 252 and
@@ -182,10 +182,10 @@ is
 
    --  Local subprogram bodies
 
-   procedure NTTu_Inner (F_Hat : in out Poly_Zq;
-                         Zeta  : in     Zq;
-                         Start : in     Index_256;
-                         Len   : in     Len_T)
+   procedure NTT_Inner (F_Hat : in out Poly_Zq;
+                        Zeta  : in     Zq;
+                        Start : in     Index_256;
+                        Len   : in     Len_T)
    is
       T : Zq;
    begin
@@ -194,12 +194,12 @@ is
          F_Hat (J + Len) := F_Hat (J) - T;
          F_Hat (J)       := F_Hat (J) + T;
       end loop;
-   end NTTu_Inner;
+   end NTT_Inner;
 
-   procedure Atomic_NTTu_Inner (F_Hat : in out Atomic_Poly_Zq;
-                                Zeta  : in     Zq;
-                                Start : in     Index_256;
-                                Len   : in     Len_T)
+   procedure Atomic_NTT_Inner (F_Hat : in out Atomic_Poly_Zq;
+                               Zeta  : in     Zq;
+                               Start : in     Index_256;
+                               Len   : in     Len_T)
    is
       Tmp  : Zq;
       Tmp2 : Zq;
@@ -212,7 +212,7 @@ is
          F_Hat (J + Len) := Tmp2 - Tmp;
          F_Hat (J)       := Tmp2 + Tmp;
       end loop;
-   end Atomic_NTTu_Inner;
+   end Atomic_NTT_Inner;
 
    --  Exported subprogram bodies
 
@@ -239,10 +239,10 @@ is
             pragma Loop_Invariant (Count * Len = 128);
             pragma Loop_Invariant (J * 2 * Len <= 252);
             pragma Loop_Invariant (I32 (K) = 2**I + J);
-            NTTu_Inner (F_Hat => F_Hat,
-                        Zeta  => Zeta_ExpC (K),
-                        Start => J * 2 * Len,
-                        Len   => Len);
+            NTT_Inner (F_Hat => F_Hat,
+                       Zeta  => Zeta_ExpC (K),
+                       Start => J * 2 * Len,
+                       Len   => Len);
             K := K + 1;
          end loop;
 
@@ -269,57 +269,57 @@ is
 
       -- I = 0 -----------------
 --      for J in I32 range 0 .. 0 loop
-      NTTu_Inner (F_Hat => F_Hat,
-                  Zeta  => Zeta_ExpC (1),
-                  Start => 0,
-                  Len   => 128);
+      NTT_Inner (F_Hat => F_Hat,
+                 Zeta  => Zeta_ExpC (1),
+                 Start => 0,
+                 Len   => 128);
 --      end loop;
       -- I = 1 -----------------
 --      for J in I32 range 0 .. 1 loop
-      NTTu_Inner (F_Hat => F_Hat,
-                  Zeta  => Zeta_ExpC (2),
-                  Start => 0,
-                  Len   => 64);
+      NTT_Inner (F_Hat => F_Hat,
+                 Zeta  => Zeta_ExpC (2),
+                 Start => 0,
+                 Len   => 64);
 
-      NTTu_Inner (F_Hat => F_Hat,
-                  Zeta  => Zeta_ExpC (3),
-                  Start => 128,
-                  Len   => 64);
+      NTT_Inner (F_Hat => F_Hat,
+                 Zeta  => Zeta_ExpC (3),
+                 Start => 128,
+                 Len   => 64);
 --      end loop;
       -- I = 2 -----------------
       for J in I32 range 0 .. 3 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (4 + Byte (J)),
-                     Start => J * 2 * 32,
-                     Len   => 32);
+         NTT_Inner (F_Hat => F_Hat,
+                    Zeta  => Zeta_ExpC (4 + Byte (J)),
+                    Start => J * 2 * 32,
+                    Len   => 32);
       end loop;
       -- I = 3 -----------------
       for J in I32 range 0 .. 7 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (8 + Byte (J)),
-                     Start => J * 2 * 16,
-                     Len   => 16);
+         NTT_Inner (F_Hat => F_Hat,
+                    Zeta  => Zeta_ExpC (8 + Byte (J)),
+                    Start => J * 2 * 16,
+                    Len   => 16);
       end loop;
       -- I = 4 -----------------
       for J in I32 range 0 .. 15 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (16 + Byte (J)),
-                     Start => J * 2 * 8,
-                     Len   => 8);
+         NTT_Inner (F_Hat => F_Hat,
+                    Zeta  => Zeta_ExpC (16 + Byte (J)),
+                    Start => J * 2 * 8,
+                    Len   => 8);
       end loop;
       -- I = 5 -----------------
       for J in I32 range 0 .. 31 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (32 + Byte (J)),
-                     Start => J * 2 * 4,
-                     Len   => 4);
+         NTT_Inner (F_Hat => F_Hat,
+                    Zeta  => Zeta_ExpC (32 + Byte (J)),
+                    Start => J * 2 * 4,
+                    Len   => 4);
       end loop;
       -- I = 6 -----------------
       for J in I32 range 0 .. 63 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (64 + Byte (J)),
-                     Start => J * 2 * 2,
-                     Len   => 2);
+         NTT_Inner (F_Hat => F_Hat,
+                    Zeta  => Zeta_ExpC (64 + Byte (J)),
+                    Start => J * 2 * 2,
+                    Len   => 2);
       end loop;
       -------------------
 
@@ -428,7 +428,7 @@ is
                         K     : in SU7)
       is
       begin
-         NTTu_Inner (F, Zeta_ExpC (K), Start, Len);
+         NTT_Inner (F, Zeta_ExpC (K), Start, Len);
          if Len >= 4 then
             NTTirl (Start,       Len / 2, K * 2);
             NTTirl (Start + Len, Len / 2, K * 2 + 1);
@@ -454,7 +454,7 @@ is
       task body NTTtirl
       is
       begin
-         Atomic_NTTu_Inner (F, Zeta_ExpC (K), Start, Len);
+         Atomic_NTT_Inner (F, Zeta_ExpC (K), Start, Len);
          if Len >= 4 then
             declare
                --  Spawn two more tasks for the left and right
