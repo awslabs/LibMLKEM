@@ -26,6 +26,14 @@ is
    type UPoly is array (Index_256 range <>) of Zq;
    subtype Poly_Zq is UPoly (Index_256);
 
+   --  For lock-free, tasking implementation, we need our
+   --  Poly_Zq to have components which are both Atomic and
+   --  independently addressible.
+   type Atomic_UPoly is array (Index_256 range <>) of Zq
+     with Atomic_Components,
+          Independent_Components;
+   subtype Atomic_Poly_Zq is Atomic_UPoly (Index_256);
+
    --====================
    --  NTT
    --====================
@@ -51,7 +59,7 @@ is
           No_Inline;
 
    --  Tree-parallel/tasking, in-place
-   procedure NTTtir (F : in out Poly_Zq)
+   procedure NTTtir (F : in out Atomic_Poly_Zq)
      with Global => null,
           No_Inline;
 

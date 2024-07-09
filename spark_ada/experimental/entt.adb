@@ -170,6 +170,15 @@ is
             Pre    => Start <= 252 and
                       Start + 2 * Len <= 256;
 
+   procedure Atomic_NTTu_Inner (F_Hat : in out Atomic_Poly_Zq;
+                                Zeta  : in     Zq;
+                                Start : in     Index_256;
+                                Len   : in     Len_T)
+       with No_Inline,
+            Global => null,
+            Pre    => Start <= 252 and
+                      Start + 2 * Len <= 256;
+
 
    --  Local subprogram bodies
 
@@ -187,6 +196,25 @@ is
          F_Hat (J)       := F_Hat (J) + T;
       end loop;
    end NTTu_Inner;
+
+   procedure Atomic_NTTu_Inner (F_Hat : in out Atomic_Poly_Zq;
+                                Zeta  : in     Zq;
+                                Start : in     Index_256;
+                                Len   : in     Len_T)
+   is
+      Tmp  : Zq;
+      Tmp2 : Zq;
+   begin
+      for J in Index_256 range Start .. Start + (Len - 1) loop
+         pragma Loop_Optimize (Ivdep, Vector);
+         Tmp             := F_Hat (J + Len);
+         Tmp             := Zeta * Tmp;
+
+         Tmp2            := F_Hat (J);
+         F_Hat (J + Len) := Tmp2 - Tmp;
+         F_Hat (J)       := Tmp2 + Tmp;
+      end loop;
+   end Atomic_NTTu_Inner;
 
    --  Exported subprogram bodies
 
@@ -419,7 +447,7 @@ is
    end NTTir;
 
 
-   procedure NTTtir (F : in out Poly_Zq)
+   procedure NTTtir (F : in out Atomic_Poly_Zq)
      with SPARK_Mode => Off -- no nested tasking allowed in SPARK...
    is
       task type NTTtirl (Start : Index_256;
@@ -433,7 +461,7 @@ is
       task body NTTtirl
       is
       begin
-         NTTu_Inner (F, Zeta_ExpC (K), Start, Len);
+         Atomic_NTTu_Inner (F, Zeta_ExpC (K), Start, Len);
          if Len >= 4 then
             declare
                --  Spawn two more tasks for the left and right
