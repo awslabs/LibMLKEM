@@ -5,9 +5,9 @@ with Interfaces; use Interfaces;
 package ENTT
   with SPARK_Mode => On
 is
-   -- =================================
-   -- Experimental NTT implementations
-   -- =================================
+   --===================================
+   --  Experimental NTT implementations
+   --===================================
 
    Q    : constant := 3329;
    QINV : constant := -3327;
@@ -27,7 +27,7 @@ is
    subtype Poly_Zq is UPoly (Index_256);
 
    --====================
-   -- NTT
+   --  NTT
    --====================
 
    --  Standard CT-based NTT implemented as per FIPS 203
@@ -56,10 +56,10 @@ is
           No_Inline;
 
    --====================
-   -- Inverse NTT
+   --  Inverse NTT
    --====================
 
-   -- Standard, GS-based NTT implemented as per FIPS 203
+   --  Standard, GS-based NTT implemented as per FIPS 203
    function NTT_Inv (F : in Poly_Zq) return Poly_Zq
      with Global => null,
           No_Inline;

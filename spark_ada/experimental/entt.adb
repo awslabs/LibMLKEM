@@ -1,7 +1,7 @@
 --  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 --  SPDX-License-Identifier: Apache-2.0
 
-with Ada.Text_IO; use Ada.Text_IO;
+--  with Ada.Text_IO; use Ada.Text_IO;
 package body ENTT
   with SPARK_Mode => On
 is
@@ -10,15 +10,18 @@ is
 
    --  A power of 2 between 2 and 128. Used in NTT and NTT_Inv
    subtype Len_T is Index_256
-      with Dynamic_Predicate => (for some I in NTT_Len_Power => Len_T = 2**I);
+      with Dynamic_Predicate =>
+         (for some I in NTT_Len_Power => Len_T = 2**I);
 
    --  A power of 2 between 1 and 64. Used in NTT and NTT_Inv
    subtype Count_T is Index_256
-      with Dynamic_Predicate => (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
+      with Dynamic_Predicate =>
+         (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
 
    --  A power of 2 between 4 and 256
    subtype NTT_Slice_Length is I32
-      with Dynamic_Predicate => (for some I in 2 .. 8 => NTT_Slice_Length = 2**I);
+      with Dynamic_Predicate =>
+         (for some I in 2 .. 8 => NTT_Slice_Length = 2**I);
 
    subtype SU7 is Byte range 0 .. 127;
    type Zeta_Exp_Table_Type is array (SU7) of Zq;
@@ -153,6 +156,7 @@ is
       126 => 885,
       127 => 2154);
 
+   --  Local subprogram declarations
 
    procedure NTTu_Inner (F_Hat : in out Poly_Zq;
                          Zeta  : in     Zq;
@@ -161,7 +165,15 @@ is
        with No_Inline,
             Global => null,
             Pre    => Start <= 252 and
-                      Start + 2 * Len <= 256
+                      Start + 2 * Len <= 256;
+
+
+   --  Local subprogram bodies
+
+   procedure NTTu_Inner (F_Hat : in out Poly_Zq;
+                         Zeta  : in     Zq;
+                         Start : in     Index_256;
+                         Len   : in     Len_T)
    is
       T : Zq;
    begin
@@ -173,20 +185,7 @@ is
       end loop;
    end NTTu_Inner;
 
-   --  As above, but with Start => 0, Len => 128, Zeta => 1729
-   procedure NTT128_Inner (F_Hat : in out Poly_Zq)
-       with No_Inline,
-            Global => null
-   is
-      T : Zq;
-   begin
-      for J in Index_256 range 0 .. 127 loop
-         pragma Loop_Optimize (Ivdep, Vector);
-         T               := 1729 * F_Hat (J + 128);
-         F_Hat (J + 128) := F_Hat (J) - T;
-         F_Hat (J)       := F_Hat (J) + T;
-      end loop;
-   end NTT128_Inner;
+   --  Exported subprogram bodies
 
    function NTT (F : in Poly_Zq) return Poly_Zq
      with SPARK_Mode => Off
@@ -196,24 +195,6 @@ is
       K     : K_T;
       Len   : Len_T;
       Count : Count_T;
-
-      --  procedure NTT_Inner (Zeta  : in     Zq;
-      --                       Start : in     Index_256)
-      --    with No_Inline,
-      --         Global => (In_Out => F_Hat,
-      --                    Input  => Len),
-      --         Pre    => Start <= 252 and
-      --                   Start + 2 * Len <= 256
-      --  is
-      --     T : Zq;
-      --  begin
-      --     for J in Index_256 range Start .. Start + (Len - 1) loop
-      --        T               := Zeta * F_Hat (J + Len);
-      --        F_Hat (J + Len) := F_Hat (J) - T;
-      --        F_Hat (J)       := F_Hat (J) + T;
-      --     end loop;
-      --  end NTT_Inner;
-
    begin
       F_Hat := F;
       K     := 1;
@@ -250,15 +231,6 @@ is
    end NTT;
 
 
-
-   -- I Start Len    J Range     Reads        Writes
-   -- 0     0 128    0 .. 127    0 .. 255     0 .. 255
-
-   -- 1     0  64    0 ..  63    0 .. 127     0 .. 127 (bottom half)
-   -- 1   128  64  128 .. 191  128 .. 255   128 .. 255 (top half)
-
-
-
    function NTTu (F : in Poly_Zq) return Poly_Zq
      with SPARK_Mode => Off
    is
@@ -268,23 +240,22 @@ is
 
       -- I = 0 -----------------
 --      for J in I32 range 0 .. 0 loop
-      NTT128_Inner (F_Hat);
---      NTTu_Inner (F_Hat => F_Hat,
---                  Zeta  => Zeta_ExpC (1),
---                  Start => 0,
---                  Len   => 128);
+      NTTu_Inner (F_Hat => F_Hat,
+                  Zeta  => Zeta_ExpC (1),
+                  Start => 0,
+                  Len   => 128);
 --      end loop;
       -- I = 1 -----------------
 --      for J in I32 range 0 .. 1 loop
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (2),
-                     Start => 0,
-                     Len   => 64);
+      NTTu_Inner (F_Hat => F_Hat,
+                  Zeta  => Zeta_ExpC (2),
+                  Start => 0,
+                  Len   => 64);
 
-         NTTu_Inner (F_Hat => F_Hat,
-                     Zeta  => Zeta_ExpC (3),
-                     Start => 128,
-                     Len   => 64);
+      NTTu_Inner (F_Hat => F_Hat,
+                  Zeta  => Zeta_ExpC (3),
+                  Start => 128,
+                  Len   => 64);
 --      end loop;
       -- I = 2 -----------------
       for J in I32 range 0 .. 3 loop
@@ -462,13 +433,14 @@ is
          NTTu_Inner (F, Zeta_ExpC (K), Start, Len);
          if Len >= 4 then
             declare
-               --  Spawn two more tasks for the left and right halves of the given array
+               --  Spawn two more tasks for the left and right
+               --  halves of the given array
                TL : NTT2 (Start,       Len / 2, K * 2);
                TR : NTT2 (Start + Len, Len / 2, K * 2 + 1);
             begin
-               --  This block statement will terminate when both dependent tasks
-               --  TL and TR have terminated.
-              null;
+               --  This block statement will terminate when both dependent
+               --  tasks TL and TR have terminated.
+               null;
             end;
          end if;
       end NTTtirl;
@@ -482,7 +454,7 @@ is
 
 
    --====================
-   -- Inverse NTT
+   --  Inverse NTT
    --====================
 
    procedure NTT_Inv_Inner (F_Hat : in out Poly_Zq;
@@ -572,7 +544,7 @@ is
    begin
       F_Hat := F; --  calls _memcpy()
 
-      -- I = 6, Len =   2, Count = 64
+      --  I = 6, Len =   2, Count = 64
       for J in I32 range 0 .. 63 loop
          pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
@@ -581,7 +553,7 @@ is
                         Len   => 2);
       end loop;
 
-      -- I = 5, Len =   4, Count = 32
+      --  I = 5, Len =   4, Count = 32
       for J in I32 range 0 .. 31 loop
          pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
@@ -590,7 +562,7 @@ is
                         Len   => 4);
       end loop;
 
-      -- I = 4, Len =   8, Count = 16
+      --  I = 4, Len =   8, Count = 16
       for J in I32 range 0 .. 15 loop
          pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
@@ -599,7 +571,7 @@ is
                         Len   => 8);
       end loop;
 
-      -- I = 3, Len =  16, Count = 8
+      --  I = 3, Len =  16, Count = 8
       for J in I32 range 0 .. 7 loop
          pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
@@ -608,7 +580,7 @@ is
                         Len   => 16);
       end loop;
 
-      -- I = 2, Len =  32, Count = 4
+      --  I = 2, Len =  32, Count = 4
       for J in I32 range 0 .. 3 loop
          pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
@@ -617,7 +589,7 @@ is
                         Len   => 32);
       end loop;
 
-      -- I = 1, Len =  64, Count = 2
+      --  I = 1, Len =  64, Count = 2
       NTT_Inv_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (3),
                      Start => 0,
@@ -627,7 +599,7 @@ is
                      Start => 128,
                      Len   => 64);
 
-      -- I = 0, Len = 128, Count = 1
+      --  I = 0, Len = 128, Count = 1
       NTT_Inv_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (1),
                      Start => 0,
@@ -739,8 +711,10 @@ is
       return (if F'Length = 4 then
                  GS_Butterfly (F)
               else
-                 GS_Butterfly (NTT_Invsrl (Half_Poly (F   (0 .. Len - 1)), K * 2 + 1) &
-                               NTT_Invsrl (Half_Poly (F (Len .. F'Last)),  K * 2)));
+                 GS_Butterfly (NTT_Invsrl (Half_Poly (F   (0 .. Len - 1)),
+                                           K * 2 + 1) &
+                               NTT_Invsrl (Half_Poly (F (Len .. F'Last)),
+                                           K * 2)));
    end NTT_Invsrl;
 
    function NTT_Invsr (F : in Poly_Zq) return Poly_Zq
