@@ -1,0 +1,33 @@
+project TNTT
+is
+   for Source_Dirs use (".");
+
+   for Main use ("tntt.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnata",
+         "-gnatwaJ",
+         "-gnaty-s",
+         "-O3",
+         "-g",
+         "-gnatp",
+         "-ffunction-sections", -- Create a linker section for each function
+         "-fdata-sections");    -- Create a linker section for each data
+   end Compiler;
+
+   package Prove is
+      for Proof_Switches ("Ada") use ("--proof=per_path",
+                                      "-j8",
+                                      "--no-global-generation",
+                                      "--no-inlining",
+                                      "--no-loop-unrolling",
+                                      "--level=2",
+                                      "--prover=z3,cvc5,altergo",
+                                      "--memlimit=0",
+                                      "--steps=50000",
+                                      "--report=statistics");
+   end Prove;
+
+end TNTT;
