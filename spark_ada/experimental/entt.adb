@@ -5,6 +5,9 @@
 package body ENTT
   with SPARK_Mode => On
 is
+   --  Reciprocal of 128 mod Q is 3303
+   Recip128_Mod_Q : constant := 3303;
+
    subtype NTT_Len_Bit_Index is Natural range 0 .. 6;
    subtype NTT_Len_Power     is Natural range 1 .. 7;
 
@@ -533,7 +536,7 @@ is
 
       --  Substitute I = 0 into the outer loop invariant to get
       pragma Assert (K = 0);
-      return F_Hat * 3303;
+      return F_Hat * Recip128_Mod_Q;
    end NTT_Inv;
 
 
@@ -605,7 +608,7 @@ is
                      Start => 0,
                      Len   => 128);
 
-      return F_Hat * 3303;
+      return F_Hat * Recip128_Mod_Q;
    end NTT_Invu;
 
    procedure NTT_Invir (F : in out Poly_Zq)
@@ -639,7 +642,7 @@ is
 
    begin
       NTT_Invirl (0, 128, 1);
-      F := F * 3303;
+      F := F * Recip128_Mod_Q;
    end NTT_Invir;
 
 
@@ -722,7 +725,7 @@ is
       T : Poly_Zq;
    begin
       T := NTT_Invsrl (F, 1);
-      return T * 3303;
+      return T * Recip128_Mod_Q;
    end NTT_Invsr;
 
 
