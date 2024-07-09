@@ -190,7 +190,6 @@ is
       T : Zq;
    begin
       for J in Index_256 range Start .. Start + (Len - 1) loop
-         pragma Loop_Optimize (Ivdep, Vector);
          T               := Zeta * F_Hat (J + Len);
          F_Hat (J + Len) := F_Hat (J) - T;
          F_Hat (J)       := F_Hat (J) + T;
@@ -206,7 +205,6 @@ is
       Tmp2 : Zq;
    begin
       for J in Index_256 range Start .. Start + (Len - 1) loop
-         pragma Loop_Optimize (Ivdep, Vector);
          Tmp             := F_Hat (J + Len);
          Tmp             := Zeta * Tmp;
 
@@ -290,7 +288,6 @@ is
 --      end loop;
       -- I = 2 -----------------
       for J in I32 range 0 .. 3 loop
-         pragma Loop_Optimize (Unroll);
          NTTu_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (4 + Byte (J)),
                      Start => J * 2 * 32,
@@ -298,7 +295,6 @@ is
       end loop;
       -- I = 3 -----------------
       for J in I32 range 0 .. 7 loop
-         pragma Loop_Optimize (Unroll);
          NTTu_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (8 + Byte (J)),
                      Start => J * 2 * 16,
@@ -306,7 +302,6 @@ is
       end loop;
       -- I = 4 -----------------
       for J in I32 range 0 .. 15 loop
-         pragma Loop_Optimize (Unroll);
          NTTu_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (16 + Byte (J)),
                      Start => J * 2 * 8,
@@ -314,7 +309,6 @@ is
       end loop;
       -- I = 5 -----------------
       for J in I32 range 0 .. 31 loop
-         pragma Loop_Optimize (Unroll);
          NTTu_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (32 + Byte (J)),
                      Start => J * 2 * 4,
@@ -322,7 +316,6 @@ is
       end loop;
       -- I = 6 -----------------
       for J in I32 range 0 .. 63 loop
-         pragma Loop_Optimize (Unroll);
          NTTu_Inner (F_Hat => F_Hat,
                      Zeta  => Zeta_ExpC (64 + Byte (J)),
                      Start => J * 2 * 2,
@@ -500,7 +493,6 @@ is
       T : Zq;
    begin
       for J in Index_256 range Start .. Start + (Len - 1) loop
-         pragma Loop_Optimize (Ivdep, Vector);
          T := F_Hat (J);
          F_Hat (J) := T + F_Hat (J + Len);
          F_Hat (J + Len) := Zeta * (F_Hat (J + Len) - T);
@@ -577,7 +569,6 @@ is
 
       --  I = 6, Len =   2, Count = 64
       for J in I32 range 0 .. 63 loop
-         pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
                         Zeta  => Zeta_ExpC (127 - Byte (J)),
                         Start => J * 4,
@@ -586,7 +577,6 @@ is
 
       --  I = 5, Len =   4, Count = 32
       for J in I32 range 0 .. 31 loop
-         pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
                         Zeta  => Zeta_ExpC (63 - Byte (J)),
                         Start => J * 8,
@@ -595,7 +585,6 @@ is
 
       --  I = 4, Len =   8, Count = 16
       for J in I32 range 0 .. 15 loop
-         pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
                         Zeta  => Zeta_ExpC (31 - Byte (J)),
                         Start => J * 16,
@@ -604,7 +593,6 @@ is
 
       --  I = 3, Len =  16, Count = 8
       for J in I32 range 0 .. 7 loop
-         pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
                         Zeta  => Zeta_ExpC (15 - Byte (J)),
                         Start => J * 32,
@@ -613,7 +601,6 @@ is
 
       --  I = 2, Len =  32, Count = 4
       for J in I32 range 0 .. 3 loop
-         pragma Loop_Optimize (Unroll);
          NTT_Inv_Inner (F_Hat => F_Hat,
                         Zeta  => Zeta_ExpC (7 - Byte (J)),
                         Start => J * 64,
