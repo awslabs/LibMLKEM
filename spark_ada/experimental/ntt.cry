@@ -198,12 +198,13 @@ fast_invnttl v k
                   t = coerceSize ((fast_invnttl`{n-1} s0 (k * 2 + 1)) #
                                   (fast_invnttl`{n-1} s1 (k * 2)))
 
-mul_3303 : Z_q_256 -> Z_q_256
-mul_3303 v = [ v@x * 3303 | x <- [0 .. <MLKEM_N] ]
+recip_128_modq = (recip 128) : Zq
+mul_recip128 : Z_q_256 -> Z_q_256
+mul_recip128 v = [ v@x * recip_128_modq | x <- [0 .. <MLKEM_N] ]
 
 // Top level entry point - start with N=256, K=1
 fast_invntt : Z_q_256 -> Z_q_256
-fast_invntt v = mul_3303 (fast_invnttl v 1)
+fast_invntt v = mul_recip128 (fast_invnttl v 1)
 
 
 //======================================================
