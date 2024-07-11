@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-// Experimental attempt to specify fast CT-NTT in Cryptol
+//===========================================================
+// Fast CT-NTT and GS-Inverse-NTT in Cryptol
+// as required by MLKEM
+//===========================================================
+
 type MLKEM_Q = 3329
 type MLKEM_N = 256
 type Zq = (Z MLKEM_Q)
@@ -53,6 +57,8 @@ property naive_invntt_inverts f =  naive_ntt    (naive_invntt f) == f
 //======================================================
 
 
+//  "coerceSize" is a trick that forces a dynamic rather than
+//  a static type check in Cryptol.
 coerceSize : {m, n, a} [m]a -> [n]a
 coerceSize xs = [ xs @ i | i <- [0 .. <n] ]
 
