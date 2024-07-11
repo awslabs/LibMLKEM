@@ -85,40 +85,17 @@ zeta_expc = [ 1, 1729, 2580, 3289, 2642, 630, 1897, 848,
 // Fast recursive CT-NTT
 //======================================================
 
-// CT Butterfly on lower half of vector v
-ct_lowerhalf :
-    {p, q}
-    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
-    // Length of v is a member of {256,128,64,32,16,8,4}
-    // but returns half that length
-    [2^^p]Zq -> Zq -> [2^^q]Zq
-ct_lowerhalf v zeta = new_v
-  where
-    len = 2 ^^ `q
-    new_v = [ v@x + (zeta * v@(x + len)) | x <- [0 .. <(2^^q)] ]
-
-// CT Butterfly on upper half of vector v
-ct_upperhalf :
-    {p, q}
-    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
-    // Length of v is a member of {256,128,64,32,16,8,4}
-    // but returns half that length
-    [2^^p]Zq -> Zq -> [2^^q]Zq
-ct_upperhalf v zeta = new_v
-  where
-    len = 2 ^^ `q
-    new_v = [ v@x - (zeta * v@(x + len)) | x <- [0 .. <(2^^q)] ]
-
-// Single butterfly step
 ct_butterfly :
-    {m}
-    (m >= 2, m <= 8) =>
+    {m, hm}
+    (m >= 2, m <= 8, hm >= 1, hm <= 7, hm == m - 1) =>
     [2^^m]Zq -> Zq -> [2^^m]Zq
 ct_butterfly v zeta = new_v
   where
-    lower = ct_lowerhalf`{m,m-1} v zeta
-    upper = ct_upperhalf`{m,m-1} v zeta
+    halflen = 2^^`hm
+    lower = [v@x + (zeta * v@(x + halflen)) | x <- [0 .. <(2^^hm)]]
+    upper = [v@x - (zeta * v@(x + halflen)) | x <- [0 .. <(2^^hm)]]
     new_v = coerceSize (lower # upper)
+
 
 // fast_nttl - local, recursive NTT
 fast_nttl :
@@ -127,14 +104,14 @@ fast_nttl :
     [2^^n]Zq -> [8] -> [2^^n]Zq
 fast_nttl v k
   // Base case. n==2 so just compute the butterfly and return
-  | n == 2 => ct_butterfly`{n} v (zeta_expc@k)
+  | n == 2 => ct_butterfly`{n,n-1} v (zeta_expc@k)
 
   // Recursive case. Butterfly what we have, then recurse on each half,
   // concatenate the results and return
   | n  > 2 => coerceSize ((fast_nttl`{n-1} s0 (k * 2)) #
                           (fast_nttl`{n-1} s1 (k * 2 + 1)))
                 where
-                  t = ct_butterfly`{n} v (zeta_expc@k)
+                  t = ct_butterfly`{n,n-1} v (zeta_expc@k)
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize t)
 
@@ -147,45 +124,19 @@ fast_ntt v = fast_nttl v 1
 // Fast recursive GS-Inverse-NTT
 //======================================================
 
-
-
-// GS Butterfly on lower half of vector v
-gs_lowerhalf :
-    {p, q}
-    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
-    // Length of v is a member of {256,128,64,32,16,8,4}
-    // but returns half that length
-    [2^^p]Zq -> [2^^q]Zq
-gs_lowerhalf v = new_v
-  where
-    len = 2 ^^ `q
-    new_v = [ v@x + v@(x + len) | x <- [0 .. <(2^^q)]]
-
-// GS Butterfly on upper half of vector v
-gs_upperhalf :
-    {p, q}
-    (fin p, p >= 2, p <= 8, fin q, q >= 1, q <= 7, q == p - 1) =>
-    // Length of v is a member of {256,128,64,32,16,8,4}
-    // but returns half that length
-    [2^^p]Zq -> Zq -> [2^^q]Zq
-gs_upperhalf v zeta = new_v
-  where
-    len = 2 ^^ `q
-    new_v = [ zeta * (v@(x + len) - v@x) | x <- [0 .. <(2^^q)] ]
-
-// Single butterfly step
 gs_butterfly :
-    {m}
-    (m >= 2, m <= 8) =>
+    {m, hm}
+    (m >= 2, m <= 8, hm >= 1, hm <= 7, hm == m - 1) =>
     [2^^m]Zq -> Zq -> [2^^m]Zq
 gs_butterfly v zeta = new_v
   where
-    lower = gs_lowerhalf`{m,m-1} v
-    upper = gs_upperhalf`{m,m-1} v zeta
+    halflen = 2^^`hm
+    lower = [v@x +   v@(x + halflen)        | x <- [0 .. <(2^^hm)]]
+    upper = [zeta * (v@(x + halflen) - v@x) | x <- [0 .. <(2^^hm)]]
     new_v = coerceSize (lower # upper)
 
 
-// fast_nttl - local, recursive NTT
+// fast_invnttl - local, recursive Inverse NTT
 fast_invnttl :
     {n}  // Length of v is a member of {256,128,64,32,16,8,4}
     (n >= 2, n <= 8) =>
@@ -193,17 +144,18 @@ fast_invnttl :
 
 fast_invnttl v k
   // Base case. n==2 so just compute the butterfly and return
-  | n == 2 => gs_butterfly`{n} v (zeta_expc@k)
+  | n == 2 => gs_butterfly`{n,n-1} v (zeta_expc@k)
 
   // Recursive case. Recurse on each half,
   // concatenate the results, butterfly that, and return
-  | n  > 2 => gs_butterfly`{n} t (zeta_expc@k)
+  | n  > 2 => gs_butterfly`{n,n-1} t (zeta_expc@k)
                 where
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize v)
                   t = coerceSize ((fast_invnttl`{n-1} s0 (k * 2 + 1)) #
                                   (fast_invnttl`{n-1} s1 (k * 2)))
 
+// Multiply all elements of v by the reciprocal of 128 (modulo Q)
 recip_128_modq = (recip 128) : Zq
 mul_recip128 : Z_q_256 -> Z_q_256
 mul_recip128 v = [ v@x * recip_128_modq | x <- [0 .. <MLKEM_N] ]
