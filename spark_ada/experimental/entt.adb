@@ -351,53 +351,34 @@ is
       pragma Assert (Len * 2 = F'Length);
       subtype Half_Poly is UPoly (0 .. Len - 1);
 
-      function CT_Lowerhalf (T    : in This_Poly;
-                             Zeta : in Zq) return Half_Poly
-        with Global => (Input => Len,
-                        Proof_In => F),
-             Pre    => T'First = 0
-      is
-         R : Half_Poly;
-      begin
-         for I in R'Range loop
-            R (I) := T (I) + Zeta * T (I + Len);
-         end loop;
-         return R;
-      end CT_Lowerhalf;
-
-      function CT_Upperhalf (T    : in This_Poly;
-                             Zeta : in Zq) return Half_Poly
+      function CT_Butterfly (F_Hat : in This_Poly;
+                             Zeta  : in Zq) return This_Poly
         with Global => (Input    => Len,
                         Proof_In => F),
-             Pre    => T'First = 0
+             Pre    => F_Hat'First = 0 and
+                       F_Hat'Length in NTT_Slice_Length
       is
-         R : Half_Poly;
+         --  TBD prove total initialization of this using 'Initialized
+         R : This_Poly := (others => 0);
+         T : Zq;
       begin
-         for J in R'Range loop
-            R (J) := T (J) - Zeta * T (J + Len);
+         for I in Half_Poly'Range loop
+            T           := Zeta * F_Hat (I + Len);
+            R (I + Len) := F_Hat (I) - T;
+            R (I)       := F_Hat (I) + T;
          end loop;
-         return R;
-      end CT_Upperhalf;
 
-      function CT_Butterfly (T    : in This_Poly;
-                             Zeta : in Zq) return This_Poly
-        with Global => (Input    => Len,
-                        Proof_In => F),
-             Pre    => T'First = 0 and
-                       T'Length in NTT_Slice_Length
-      is
-      begin
-         return CT_Lowerhalf (T, Zeta) & CT_Upperhalf (T, Zeta);
+         return R;
       end CT_Butterfly;
 
-      Zeta : constant Zq := Zeta_ExpC (K);
-      T    : constant This_Poly := CT_Butterfly (F, Zeta);
+      Zeta  : constant Zq := Zeta_ExpC (K);
+      F_Hat : constant This_Poly := CT_Butterfly (F, Zeta);
    begin
-      return (if T'Length = 4 then
-                 T
+      return (if F_Hat'Length = 4 then
+                 F_Hat
               else
-                 NTTsrl (Half_Poly (T   (0 .. Len - 1)), K * 2) &
-                 NTTsrl (Half_Poly (T (Len .. T'Last)),  K * 2 + 1));
+                 NTTsrl (Half_Poly (F_Hat   (0 .. Len - 1)),     K * 2) &
+                 NTTsrl (Half_Poly (F_Hat (Len .. F_Hat'Last)),  K * 2 + 1));
    end NTTsrl;
 
 
@@ -689,40 +670,23 @@ is
 
       Zeta : constant Zq := Zeta_ExpC (K);
 
-      function GS_Lowerhalf (T : in This_Poly) return Half_Poly
-        with Global => (Input    => Len,
-                        Proof_In => F),
-             Pre    => T'First = 0
-      is
-         R : Half_Poly;
-      begin
-         for J in Index_256 range 0 .. Len - 1 loop
-            R (J) := T (J) + T (J + Len);
-         end loop;
-         return R;
-      end GS_Lowerhalf;
-
-      function GS_Upperhalf (T : in This_Poly) return Half_Poly
+      function GS_Butterfly (F_Hat : in This_Poly) return This_Poly
         with Global => (Input    => (Len, Zeta),
                         Proof_In => F),
-             Pre    => T'First = 0
+             Pre    => F_Hat'First = 0 and
+                       F_Hat'Length in NTT_Slice_Length
       is
-         R : Half_Poly;
+         --  TBD prove total initialization of this using 'Initialized
+         R : This_Poly := (others => 0);
+         T : Zq;
       begin
-         for J in R'Range loop
-            R (J) := Zeta * (T (J + Len) - T (J));
+         for I in Half_Poly'Range loop
+            T           := F_Hat (I);
+            R (I)       := T + F_Hat (I + Len);
+            R (I + Len) := Zeta * (F_Hat (I + Len) - T);
          end loop;
-         return R;
-      end GS_Upperhalf;
 
-      function GS_Butterfly (T : in This_Poly) return This_Poly
-        with Global => (Input    => (Len, Zeta),
-                        Proof_In => F),
-             Pre    => T'First = 0 and
-                       T'Length in NTT_Slice_Length
-      is
-      begin
-         return GS_Lowerhalf (T) & GS_Upperhalf (T);
+         return R;
       end GS_Butterfly;
 
    begin
