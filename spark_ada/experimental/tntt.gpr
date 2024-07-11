@@ -7,12 +7,12 @@ is
    package Compiler is
       for Default_Switches ("Ada") use
         ("-gnat2022",
-         "-gnata",
          "-gnatwaJ",
          "-gnaty-s",
+--         "-gnatp",
+         "-gnata",
          "-O3",
          "-g",
-         "-gnatp",
          "-ffunction-sections", -- Create a linker section for each function
          "-fdata-sections");    -- Create a linker section for each data
    end Compiler;
