@@ -1,7 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-
 //===========================================================
 // Fast CT-NTT and GS-Inverse-NTT in Cryptol
 // as required by MLKEM
@@ -56,7 +55,6 @@ property naive_invntt_inverts f =  naive_ntt    (naive_invntt f) == f
 // End of Galois section
 //======================================================
 
-
 //  "coerceSize" is a trick that forces a dynamic rather than
 //  a static type check in Cryptol.
 coerceSize : {m, n, a} [m]a -> [n]a
@@ -92,10 +90,10 @@ ct_butterfly :
 ct_butterfly v zeta = new_v
   where
     halflen = 2^^`hm
-    lower = [v@x + (zeta * v@(x + halflen)) | x <- [0 .. <(2^^hm)]]
-    upper = [v@x - (zeta * v@(x + halflen)) | x <- [0 .. <(2^^hm)]]
+    lower, upper : [2^^hm]Zq
+    lower@x = v@x + (zeta * v@(x + halflen))
+    upper@x = v@x - (zeta * v@(x + halflen))
     new_v = coerceSize (lower # upper)
-
 
 // fast_nttl - local, recursive NTT
 fast_nttl :
@@ -115,7 +113,6 @@ fast_nttl v k
                   // Split t into two halves s0 and s1
                   [s0, s1] = split (coerceSize t)
 
-
 // Top level entry point - start with N=256, K=1
 fast_ntt : Z_q_256 -> Z_q_256
 fast_ntt v = fast_nttl v 1
@@ -131,10 +128,10 @@ gs_butterfly :
 gs_butterfly v zeta = new_v
   where
     halflen = 2^^`hm
-    lower = [v@x +   v@(x + halflen)        | x <- [0 .. <(2^^hm)]]
-    upper = [zeta * (v@(x + halflen) - v@x) | x <- [0 .. <(2^^hm)]]
+    lower, upper : [2^^hm]Zq
+    lower@x = v@x  + v@(x + halflen)
+    upper@x = zeta * (v@(x + halflen) - v@x)
     new_v = coerceSize (lower # upper)
-
 
 // fast_invnttl - local, recursive Inverse NTT
 fast_invnttl :
@@ -163,7 +160,6 @@ mul_recip128 v = [ v@x * recip_128_modq | x <- [0 .. <MLKEM_N] ]
 // Top level entry point - start with N=256, K=1
 fast_invntt : Z_q_256 -> Z_q_256
 fast_invntt v = mul_recip128 (fast_invnttl v 1)
-
 
 //======================================================
 // Properties and proofs
