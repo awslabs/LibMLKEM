@@ -91,8 +91,8 @@ ct_butterfly v zeta = new_v
   where
     halflen = 2^^`hm
     lower, upper : [2^^hm]Zq
-    lower@x = v@x + (zeta * v@(x + halflen))
-    upper@x = v@x - (zeta * v@(x + halflen))
+    lower@x = v@x + zeta * v@(x + halflen)
+    upper@x = v@x - zeta * v@(x + halflen)
     new_v = coerceSize (lower # upper)
 
 // fast_nttl - local, recursive NTT
