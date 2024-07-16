@@ -44,12 +44,12 @@ naive_invntt : Z_q_256 -> Z_q_256
 naive_invntt f = [term*(recip 128) | term <- ParametricNTTInv f (recip base_zeta)]
 
 // Properties and proofs
+
 naive_ntt_inverts    : Z_q_256 -> Bit
-naive_invntt_inverts : Z_q_256 -> Bit
 property naive_ntt_inverts    f =  naive_invntt (naive_ntt f)    == f
+
+naive_invntt_inverts : Z_q_256 -> Bit
 property naive_invntt_inverts f =  naive_ntt    (naive_invntt f) == f
-// :prove naive_ntt_inverts    - OK using Z3
-// :prove naive_invntt_inverts - OK using Z3
 
 //======================================================
 // End of Galois section
@@ -165,18 +165,30 @@ fast_invntt v = mul_recip128 (fast_invnttl v 1)
 // Properties and proofs
 //======================================================
 
+// This property demonstrates that `fast_ntt` is the inverse of `fast_invntt`.
+// ```
+// :prove fast_ntt_inverts
+// ```
 fast_ntt_inverts    : Z_q_256 -> Bit
 property fast_ntt_inverts    f =  fast_invntt (fast_ntt f)    == f
 
+// This property demonstrates that `fast_invntt` is the inverse of `fast_ntt`.
+// ```
+// :prove fast_invntt_inverts
+// ```
 fast_invntt_inverts : Z_q_256 -> Bit
 property fast_invntt_inverts f =  fast_ntt    (fast_invntt f) == f
-// :prove fast_ntt_inverts
-// :prove fast_invntt_inverts
 
+// This property demonstrates that `naive_ntt` is equivalent to `fast_ntt`.
+// ```
+// :prove naive_fast_ntt_equiv
+// ```
 naive_fast_ntt_equiv : Z_q_256 -> Bit
 property naive_fast_ntt_equiv f =  naive_ntt f == fast_ntt f
-// :prove naive_fast_ntt_equiv
 
+// This property demonstrates that `naive_invntt` is equivalent to `fast_invntt`.
+// ```
+// :prove naive_fast_invntt_equiv
+// ```
 naive_fast_invntt_equiv : Z_q_256 -> Bit
 property naive_fast_invntt_equiv f =  naive_invntt f == fast_invntt f
-// :prove naive_fast_invntt_equiv
