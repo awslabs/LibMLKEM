@@ -27,7 +27,7 @@ library project MLKEM is
    type Concurrency_Kind is ("sequential", "parallel_3", "parallel_all");
    Concurrency_Option : Concurrency_Kind := External ("MLKEM_CONCURRENCY", "sequential");
 
-   type Build_Kind is ("debug", "O1", "O2", "O3", "Os", "Og");
+   type Build_Kind is ("debug", "O1", "O2", "O3", "Os", "Og", "profile");
    Build_Mode : Build_Kind := External ("MLKEM_BUILD_MODE", "debug");
 
    type Runtime_Kind is ("full", "zfp");
@@ -104,6 +104,9 @@ library project MLKEM is
       when "Og" =>
          Build_Switches := ("-g",
                             "-Og");
+      when "profile" =>  -- Build for profiling with DTrace and Flamegraph
+         Build_Switches := ("-O2", -- Optimization
+                            "-g"); -- Debug info
    end case;
 
    --  Extend this case choice for any other target/architecture specific switches
