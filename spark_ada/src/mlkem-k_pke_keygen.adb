@@ -34,8 +34,8 @@ begin
 
    T_Hat := A_Hat * S_Hat + E_Hat;
 
-   EK := ByteEncode12 (T_Hat) & Rho; --  calls _memcpy()
-   DK := ByteEncode12 (S_Hat);
+   EK := ByteEncode12New (T_Hat) & Rho; --  calls _memcpy()
+   DK := ByteEncode12New (S_Hat);
 
    return PKE_Key'(EK, DK); --  calls _memcpy() (twice)
 end K_PKE_KeyGen;

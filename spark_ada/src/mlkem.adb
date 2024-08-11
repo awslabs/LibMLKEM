@@ -1,6 +1,8 @@
 --  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 --  SPDX-License-Identifier: Apache-2.0
 
+with Ada.Text_IO; use Ada.Text_IO;
+
 with SHA3;  use SHA3;
 with SHAKE; use SHAKE;
 
@@ -62,11 +64,11 @@ is
    --  Local constants and types
    --=======================================
 
+   subtype U8_Bit is Unsigned_8 range 0 .. 1;
+
    --  Bytes_64 type is needed for SHA3
    subtype Index_64  is I32 range 0 .. 63;
    subtype Bytes_64  is Byte_Seq (Index_64);
-
-   subtype U8_Bit is Unsigned_8 range 0 .. 1;
 
    package body Zq
      with SPARK_Mode => On
@@ -286,7 +288,17 @@ is
 
    type K_Range is range 0 .. K - 1;
 
+   subtype Index_2   is I32 range 0 .. 1;
+   subtype Index_3   is I32 range 0 .. 2;
+   subtype Index_4   is I32 range 0 .. 3;
+   subtype Index_5   is I32 range 0 .. 4;
+   subtype Index_8   is I32 range 0 .. 7;
+--   subtype Index_12  is I32 range 0 .. 11;
    subtype Index_256 is I32 range 0 .. 255;
+   subtype Index_384 is I32 range 0 .. 383;
+   subtype Index_3072 is I32 range 0 .. 3071;
+
+   type Poly_Zq2 is array (Index_2) of Zq.T;
    type Poly_Zq is array (Index_256) of Zq.T;
 
    type Poly_Zq_Vector is array (K_Range) of Poly_Zq;
@@ -294,6 +306,7 @@ is
    --  Polynomials in the NTT domain are structurally identical to the
    --  above, but should never be mixed up with them, so we declare
    --  an explicitly derived named types for them here.
+   type NTT_Poly_Zq2 is new Poly_Zq2;
    type NTT_Poly_Zq is new Poly_Zq;
    type NTT_Poly_Zq_Vector is array (K_Range) of NTT_Poly_Zq;
    type NTT_Poly_Matrix    is array (K_Range) of NTT_Poly_Zq_Vector;
@@ -311,11 +324,6 @@ is
    subtype Count_T is Index_256
       with Dynamic_Predicate => (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
 
-   subtype Index_3   is I32 range 0 .. 2;
-   subtype Index_8   is I32 range 0 .. 7;
-   subtype Index_12  is I32 range 0 .. 11;
-   subtype Index_384 is I32 range 0 .. 383;
-   subtype Index_3072 is I32 range 0 .. 3071;
    subtype Index_Poly_UDU_Bytes is I32 range 0 .. ((N * DU * K) / 8 - 1);
    subtype Index_Poly_Zq_Vector_Bytes is I32 range 0 .. (384 * K - 1);
 
@@ -326,6 +334,7 @@ is
    subtype Bytes_UDV is Byte_Seq (Index_UDV_Bytes);
 
    subtype Bytes_3   is Byte_Seq (Index_3);
+   subtype Bytes_5   is Byte_Seq (Index_5);
    subtype Bytes_384 is Byte_Seq (Index_384);
 
    subtype Poly_UDU_Bytes is Byte_Seq (Index_Poly_UDU_Bytes);
@@ -335,7 +344,7 @@ is
    --  ineffecient in terms of space
    type Bit_Seq is array (N32 range <>) of U8_Bit;
 
-   subtype Bits_12 is Bit_Seq (Index_12);
+--   subtype Bits_12 is Bit_Seq (Index_12);
    subtype Bits_256 is Bit_Seq (Index_256);
    subtype Bits_3072 is Bit_Seq (Index_3072);
 
@@ -365,12 +374,17 @@ is
    type UDV is mod 2**DV
      with Object_Size => 16;
 
+   --  exactly 4 DU values
+   type Poly_UDU4 is array (Index_4) of UDU;
+
    type Poly_UDU is array (Index_256) of UDU;
+
+
    type Poly_UDV is array (Index_256) of UDV;
 
-   subtype Poly_Zq_Bit is Poly_Zq
-     with Dynamic_Predicate =>
-            (for all I in Poly_Zq_Bit'Range => Poly_Zq_Bit (I) in Zq_Bit);
+--   subtype Poly_Zq_Bit is Poly_Zq
+--     with Dynamic_Predicate =>
+--            (for all I in Poly_Zq_Bit'Range => Poly_Zq_Bit (I) in Zq_Bit);
 
    Null_NTT_Poly_Zq : constant NTT_Poly_Zq := (others => 0);
 
@@ -650,21 +664,22 @@ is
    Q_M : constant := 2_642_262_849; --  round (2**Q_C / Q);
 
    function Compress1 (X : in Zq.T) return U8_Bit
-     with No_Inline
+--     with No_Inline
    is
-      T : U64;
+--      T : U64;
    begin
-      T := U64 (X) * 4 + Q;
+      return Boolean'Pos (X >= 833 and X <= 2496);
+--      T := U64 (X) * 4 + Q;
 
       --  Division by (Q * 2) is first achieved by dividing by 2
-      T := T / 2;
+--      T := T / 2;
       --  Then multiplication by Q_M and a shift right by Q_C places
-      T := T * Q_M;
-      T := Shift_Right (T, Q_C);
+--      T := T * Q_M;
+--      T := Shift_Right (T, Q_C);
 
       --  T might be in 0 .. 2 here, so a final reduction mod 2 is required
-      T := T mod 2;
-      return U8_Bit (T);
+      --  T := T mod 2;
+--      return U8_Bit (T);
    end Compress1;
 
    function Compress1 (X : in Poly_Zq) return Bits_256
@@ -677,6 +692,7 @@ is
       end loop;
       return R;
    end Compress1;
+   pragma Unreferenced (Compress1);
 
    function CompressDV (X : in Zq.T) return UDV
      with No_Inline
@@ -756,31 +772,31 @@ is
       return R;
    end CompressDU;
 
-   function Decompress1 (Y : in U8_Bit) return Zq.T
-     with No_Inline
-   is
-      subtype RT is I32 range 0 .. 1665;
-      T : RT;
-   begin
-      --  Round (Q / 2) = 1665
-      --  0 -> 0
-      --  1 -> 1665
-      --  but implement in constant-time
-      T := RT (Y) * 1665;
-      return Zq.T (T);
-   end Decompress1;
+   --  function Decompress1 (Y : in U8_Bit) return Zq.T
+   --    with No_Inline
+   --  is
+   --     subtype RT is I32 range 0 .. 1665;
+   --     T : RT;
+   --  begin
+   --     --  Round (Q / 2) = 1665
+   --     --  0 -> 0
+   --     --  1 -> 1665
+   --     --  but implement in constant-time
+   --     T := RT (Y) * 1665;
+   --     return Zq.T (T);
+   --  end Decompress1;
 
-   --  Decompress a vector of Zq_Bit values
-   function Decompress1 (Y : in Poly_Zq_Bit) return Poly_Zq
-     with No_Inline
-   is
-      R : Poly_Zq;
-   begin
-      for I in R'Range loop
-         R (I) := Decompress1 (U8_Bit (Y (I)));
-      end loop;
-      return R;
-   end Decompress1;
+   --  --  Decompress a vector of Zq_Bit values
+   --  function Decompress1 (Y : in Poly_Zq_Bit) return Poly_Zq
+   --    with No_Inline
+   --  is
+   --     R : Poly_Zq;
+   --  begin
+   --     for I in R'Range loop
+   --        R (I) := Decompress1 (U8_Bit (Y (I)));
+   --     end loop;
+   --     return R;
+   --  end Decompress1;
 
    function DecompressDV (Y : in UDV) return Zq.T
      with No_Inline
@@ -864,6 +880,41 @@ is
    begin
       return BitsToBytes (F);
    end ByteEncode1;
+   pragma Unreferenced (ByteEncode1);
+
+   function CompressAndEncode1 (X : in Poly_Zq) return Bytes_32
+   is
+      --  Compress1 on a Zq value reduces to:
+      --       0 ..  832 => 0
+      --     833 .. 2496 => 1
+      --    2497 .. 3328 => 0
+      --  so this is trivial to implement as an inlineable
+      --  expression function:
+      function C1 (X : in Zq.T) return Byte
+         is (Boolean'Pos (X >= 833 and X <= 2496))
+         with Inline_Always;
+
+      R : Bytes_32;
+   begin
+      for I in Index_32 loop
+         pragma Loop_Optimize (No_Unroll);
+         declare
+            Offset : constant I32 := I * 8;
+         begin
+            --  X (Offset) becomes the least significant bit of R (I), so...
+            R (I) := C1 (X (Offset)) or
+                     Shift_Left (C1 (X (Offset + 1)), 1) or
+                     Shift_Left (C1 (X (Offset + 2)), 2) or
+                     Shift_Left (C1 (X (Offset + 3)), 3) or
+                     Shift_Left (C1 (X (Offset + 4)), 4) or
+                     Shift_Left (C1 (X (Offset + 5)), 5) or
+                     Shift_Left (C1 (X (Offset + 6)), 6) or
+                     Shift_Left (C1 (X (Offset + 7)), 7);
+         end;
+      end loop;
+      return R;
+   end CompressAndEncode1;
+
 
    function ByteEncodeDV (F : in Poly_UDV) return Bytes_UDV
      with No_Inline
@@ -891,7 +942,39 @@ is
       return R;
    end ByteEncodeDV;
 
-   function ByteEncodeDU (F : in Poly_UDU) return Bytes_UDU
+   function ByteEncodeDU4 (F : in Poly_UDU4) return Bytes_5
+   is
+      B1, B2, B3, B4, B5 : U16;
+      F0 : constant U16 := U16 (F (0));
+      F1 : constant U16 := U16 (F (1));
+      F2 : constant U16 := U16 (F (2));
+      F3 : constant U16 := U16 (F (3));
+   begin
+      B1 :=              F0 and 2#00_1111_1111#;
+      B2 := Shift_Right (F0 and 2#11_0000_0000#, 8) +
+            Shift_Left  (F1 and 2#00_0011_1111#, 2);
+      B3 := Shift_Right (F1 and 2#11_1100_0000#, 6) +
+            Shift_Left  (F2 and 2#00_0000_1111#, 4);
+      B4 := Shift_Right (F2 and 2#11_1111_0000#, 4) +
+            Shift_Left  (F3 and 2#00_0000_0011#, 6);
+      B5 := Shift_Right (F3 and 2#11_1111_1100#, 2);
+      return Bytes_5'(Byte (B1), Byte (B2), Byte (B3), Byte (B4), Byte (B5));
+   end ByteEncodeDU4;
+
+   function ByteEncodeDUNew (F : in Poly_UDU) return Bytes_UDU
+   is
+      R : Bytes_UDU with Relaxed_Initialization;
+   begin
+      for I in I32 range 0 .. 63 loop
+         R (I * 5 .. I * 5 + 4) := ByteEncodeDU4 (Poly_UDU4 (F (I * 4 .. I * 4 + 3)));
+         pragma Loop_Invariant (R (0 .. I * 5 + 4)'Initialized);
+      end loop;
+      pragma Assert (R (0 .. 319)'Initialized);
+      pragma Assert (R'Initialized);
+      return R;
+   end ByteEncodeDUNew;
+
+   function ByteEncodeDUOld (F : in Poly_UDU) return Bytes_UDU
      with No_Inline
    is
       R : Bytes_UDU;
@@ -915,8 +998,8 @@ is
       pragma Assert (B'Length = N * DU);
       R := BitsToBytes (B);
       return R;
-   end ByteEncodeDU;
-
+   end ByteEncodeDUOld;
+   pragma Unreferenced (ByteEncodeDUOld);
 
    function ByteEncodeDU (F : in Poly_UDU_Vector) return Poly_UDU_Bytes
      with No_Inline
@@ -925,7 +1008,7 @@ is
       C : constant I32 := (N * DU) / 8;
    begin
       for I in K_Range loop
-         R (I32 (I) * C .. (I32 (I) + 1) * C - 1) := ByteEncodeDU (F (I));
+         R (I32 (I) * C .. (I32 (I) + 1) * C - 1) := ByteEncodeDUNew (F (I));
          pragma Loop_Invariant (R (0 .. (I32 (I) + 1) * C - 1)'Initialized);
       end loop;
 
@@ -937,98 +1020,195 @@ is
    end ByteEncodeDU;
 
 
-   function Bits_12_To_U16 (X : in Bits_12) return U16
-   is (U16 (X (0)) +
-       U16 (X (1)) * 2 +
-       U16 (X (2)) * 4 +
-       U16 (X (3)) * 8 +
-       U16 (X (4)) * 16 +
-       U16 (X (5)) * 32 +
-       U16 (X (6)) * 64 +
-       U16 (X (7)) * 128 +
-       U16 (X (8)) * 256 +
-       U16 (X (9)) * 512 +
-       U16 (X (10)) * 1024 +
-       U16 (X (11)) * 2048)
-     with Ghost,
-          Post => Bits_12_To_U16'Result < 4096;
+   --  function Bits_12_To_U16 (X : in Bits_12) return U16
+   --  is (U16 (X (0)) +
+   --      U16 (X (1)) * 2 +
+   --      U16 (X (2)) * 4 +
+   --      U16 (X (3)) * 8 +
+   --      U16 (X (4)) * 16 +
+   --      U16 (X (5)) * 32 +
+   --      U16 (X (6)) * 64 +
+   --      U16 (X (7)) * 128 +
+   --      U16 (X (8)) * 256 +
+   --      U16 (X (9)) * 512 +
+   --      U16 (X (10)) * 1024 +
+   --      U16 (X (11)) * 2048)
+   --    with Ghost,
+   --         Post => Bits_12_To_U16'Result < 4096;
 
-   function Zq_To_Bits_12 (X : in Zq.T) return Bits_12
-     with Post => Bits_12_To_U16 (Zq_To_Bits_12'Result) < Q
+   --  function Zq_To_Bits_12 (X : in Zq.T) return Bits_12
+   --    with Post => Bits_12_To_U16 (Zq_To_Bits_12'Result) < Q
+   --  is
+   --     T : constant U16 := U16 (X);
+   --  begin
+   --     pragma Assert (T < Q);
+   --     return Bits_12'(0  => U8_Bit (T and 1),
+   --                     1  => U8_Bit (Shift_Right (T, 1) and 1),
+   --                     2  => U8_Bit (Shift_Right (T, 2) and 1),
+   --                     3  => U8_Bit (Shift_Right (T, 3) and 1),
+   --                     4  => U8_Bit (Shift_Right (T, 4) and 1),
+   --                     5  => U8_Bit (Shift_Right (T, 5) and 1),
+   --                     6  => U8_Bit (Shift_Right (T, 6) and 1),
+   --                     7  => U8_Bit (Shift_Right (T, 7) and 1),
+   --                     8  => U8_Bit (Shift_Right (T, 8) and 1),
+   --                     9  => U8_Bit (Shift_Right (T, 9) and 1),
+   --                     10 => U8_Bit (Shift_Right (T, 10) and 1),
+   --                     11 => U8_Bit (Shift_Right (T, 11) and 1));
+   --  end Zq_To_Bits_12;
+
+   function ByteEncode12_2 (F : in NTT_Poly_Zq2) return Bytes_3
    is
-      T : constant U16 := U16 (X);
+      B1, B2, B3 : U16;
+      F0 : constant U16 := U16 (F (0));
+      F1 : constant U16 := U16 (F (1));
    begin
-      pragma Assert (T < Q);
-      return Bits_12'(0  => U8_Bit (T and 1),
-                      1  => U8_Bit (Shift_Right (T, 1) and 1),
-                      2  => U8_Bit (Shift_Right (T, 2) and 1),
-                      3  => U8_Bit (Shift_Right (T, 3) and 1),
-                      4  => U8_Bit (Shift_Right (T, 4) and 1),
-                      5  => U8_Bit (Shift_Right (T, 5) and 1),
-                      6  => U8_Bit (Shift_Right (T, 6) and 1),
-                      7  => U8_Bit (Shift_Right (T, 7) and 1),
-                      8  => U8_Bit (Shift_Right (T, 8) and 1),
-                      9  => U8_Bit (Shift_Right (T, 9) and 1),
-                      10 => U8_Bit (Shift_Right (T, 10) and 1),
-                      11 => U8_Bit (Shift_Right (T, 11) and 1));
-   end Zq_To_Bits_12;
+      B1 :=              F0 and 2#0000_1111_1111#;
+      B2 := Shift_Right (F0 and 2#1111_0000_0000#, 8) +
+            Shift_Left  (F1 and 2#0000_0000_1111#, 4);
+      B3 := Shift_Right (F1 and 2#1111_1111_0000#, 4);
+      return Bytes_3'(Byte (B1), Byte (B2), Byte (B3));
+   end ByteEncode12_2;
 
-   function ByteEncode12 (F : in NTT_Poly_Zq) return Bytes_384
+   function ByteEncode12New (F : in NTT_Poly_Zq) return Bytes_384
      with No_Inline
    is
-      R : Bytes_384;
-      B : Bits_3072 := (others => 0); --  calls _memset()
-
-      function BitsToBytes is new Generic_BitsToBytes
-        (Index_3072, Bits_3072, Index_384, Bytes_384);
+      R : Bytes_384 with Relaxed_Initialization;
    begin
-      for I in F'Range loop
-         B (I * 12 .. I * 12 + 11) := Zq_To_Bits_12 (F (I));
-         pragma Assert (Bits_12_To_U16 (B (I * 12 .. I * 12 + 11)) < Q);
-         pragma Loop_Invariant
-           (for all K in Index_256 range 0 .. I =>
-             (Bits_12_To_U16 (B (K * 12 .. K * 12 + 11)) < Q));
+      for I in I32 range 0 .. 127 loop
+         R (I * 3 .. I * 3 + 2) := ByteEncode12_2 (NTT_Poly_Zq2 (F (I * 2 .. I * 2 + 1)));
+         pragma Loop_Invariant (R (0 .. I * 3 + 2)'Initialized);
       end loop;
-
-      pragma Assert
-        (for all K in Index_256 =>
-          (Bits_12_To_U16 (B (K * 12 .. K * 12 + 11)) < Q));
-
-      R := BitsToBytes (B);
+      pragma Assert (R (0 .. 383)'Initialized);
+      pragma Assert (R'Initialized);
       return R;
-   end ByteEncode12;
+   end ByteEncode12New;
+
+   --  function ByteEncode12Old (F : in NTT_Poly_Zq) return Bytes_384
+   --    with No_Inline
+   --  is
+   --     R : Bytes_384;
+   --     B : Bits_3072 := (others => 0); --  calls _memset()
+
+   --     function BitsToBytes is new Generic_BitsToBytes
+   --       (Index_3072, Bits_3072, Index_384, Bytes_384);
+   --  begin
+   --     for I in F'Range loop
+   --        B (I * 12 .. I * 12 + 11) := Zq_To_Bits_12 (F (I));
+   --        pragma Assert (Bits_12_To_U16 (B (I * 12 .. I * 12 + 11)) < Q);
+   --        pragma Loop_Invariant
+   --          (for all K in Index_256 range 0 .. I =>
+   --            (Bits_12_To_U16 (B (K * 12 .. K * 12 + 11)) < Q));
+   --     end loop;
+
+   --     pragma Assert
+   --       (for all K in Index_256 =>
+   --         (Bits_12_To_U16 (B (K * 12 .. K * 12 + 11)) < Q));
+
+   --     R := BitsToBytes (B);
+   --     return R;
+   --  end ByteEncode12Old;
+   --  pragma Unreferenced (ByteEncode12Old);
 
    --  Overloaded. Applies ByteEncode12 to all elements of V
-   function ByteEncode12 (V : in NTT_Poly_Zq_Vector) return Poly_Zq_Vector_Bytes
+   function ByteEncode12New (V : in NTT_Poly_Zq_Vector) return Poly_Zq_Vector_Bytes
      with No_Inline
    is
       R : Poly_Zq_Vector_Bytes with Relaxed_Initialization;
    begin
       for I in K_Range loop
-         R (I32 (I) * 384 .. I32 (I) * 384 + 383) := ByteEncode12 (V (I));
+         R (I32 (I) * 384 .. I32 (I) * 384 + 383) := ByteEncode12New (V (I));
          pragma Loop_Invariant (R (0 .. I32 (I) * 384 + 383)'Initialized);
       end loop;
 
       pragma Assert (R'Initialized);
       return R;
-   end ByteEncode12;
+   end ByteEncode12New;
 
-   function ByteDecode1 (B : in Bytes_32) return Poly_Zq_Bit
+   --  function ByteDecode1 (B : in Bytes_32) return Poly_Zq_Bit
+   --    with No_Inline
+   --  is
+   --     function BytesToBits is new Generic_BytesToBits
+   --       (Index_32, Bytes_32, Index_256, Bits_256);
+
+   --     Bits : constant Bits_256 := BytesToBits (B);
+   --     F : Poly_Zq_Bit := (others => 0); --  calls _memset()
+   --  begin
+   --     for I in F'Range loop
+   --        F (I) := Zq_Bit (Bits (I));
+   --        pragma Loop_Invariant (for all K in 0 .. I => F (K) in Zq_Bit);
+   --     end loop;
+   --     pragma Assert (F in Poly_Zq_Bit);
+   --     return F;
+   --  end ByteDecode1;
+
+
+   --  function ByteDecodeAndDecompress1 (B : in Bytes_32) return Poly_Zq
+   --    with No_Inline
+   --  is
+   --     C : constant U16 := 1665;
+   --     R : Poly_Zq with Relaxed_Initialization;
+   --  begin
+   --     for I in B'Range loop
+   --        pragma Loop_Optimize (Vector, Ivdep);
+   --        declare
+   --           Offset : constant I32 := I * 8;
+   --           TB     : constant U16 := U16 (B (I));
+   --           Bit0   : constant U16 := TB and 1;
+   --           Bit1   : constant U16 := (TB / 2) and 1;
+   --           Bit2   : constant U16 := (TB / 4) and 1;
+   --           Bit3   : constant U16 := (TB / 8) and 1;
+   --           Bit4   : constant U16 := (TB / 16) and 1;
+   --           Bit5   : constant U16 := (TB / 32) and 1;
+   --           Bit6   : constant U16 := (TB / 64) and 1;
+   --           Bit7   : constant U16 := (TB / 128) and 1;
+   --        begin
+   --           R (Offset)     := Zq.T (Bit0 * C);
+   --           R (Offset + 1) := Zq.T (Bit1 * C);
+   --           R (Offset + 2) := Zq.T (Bit2 * C);
+   --           R (Offset + 3) := Zq.T (Bit3 * C);
+   --           R (Offset + 4) := Zq.T (Bit4 * C);
+   --           R (Offset + 5) := Zq.T (Bit5 * C);
+   --           R (Offset + 6) := Zq.T (Bit6 * C);
+   --           R (Offset + 7) := Zq.T (Bit7 * C);
+   --        end;
+   --        pragma Loop_Invariant (R (0 .. I * 8 + 7)'Initialized);
+   --     end loop;
+   --     return R;
+   --  end ByteDecodeAndDecompress1;
+
+
+   function ByteDecodeAndDecompress1 (B : in Bytes_32) return Poly_Zq
      with No_Inline
    is
-      function BytesToBits is new Generic_BytesToBits
-        (Index_32, Bytes_32, Index_256, Bits_256);
-
-      Bits : constant Bits_256 := BytesToBits (B);
-      F : Poly_Zq_Bit := (others => 0); --  calls _memset()
+      C : constant U16 := 1665;
+      R : Poly_Zq;
    begin
-      for I in F'Range loop
-         F (I) := Zq_Bit (Bits (I));
-         pragma Loop_Invariant (for all K in 0 .. I => F (K) in Zq_Bit);
+      for I in B'Range loop
+         declare
+            Offset : constant I32 := I * 8;
+            TB     : Byte := B (I);
+         begin
+            R (Offset)     := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 1) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 2) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 3) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 4) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 5) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 6) := Zq.T (U16 (TB and 1) * C);
+            TB := TB / 2;
+            R (Offset + 7) := Zq.T (U16 (TB and 1) * C);
+         end;
       end loop;
-      pragma Assert (F in Poly_Zq_Bit);
-      return F;
-   end ByteDecode1;
+      return R;
+   end ByteDecodeAndDecompress1;
+
+
 
    function ByteDecodeDV (B : in Bytes_UDV) return Poly_UDV
      with No_Inline
@@ -1615,6 +1795,62 @@ is
       return F_Hat; --  calls _memcpy()
    end NTT;
 
+   procedure NTTinp (F_Hat : in out Poly_Zq)
+     with No_Inline
+   is
+      subtype K_T is Byte range 1 .. 128;
+      K     : K_T;
+      Len   : Len_T;
+      Count : Count_T;
+
+      procedure NTT_Inner (Zeta  : in     Zq.T;
+                           Start : in     Index_256)
+        with No_Inline,
+             Global => (In_Out => F_Hat,
+                        Input  => Len),
+             Pre    => Start <= 252 and
+                       Start + 2 * Len <= 256
+      is
+         T : Zq.T;
+      begin
+         for J in Index_256 range Start .. Start + (Len - 1) loop
+            T               := Zeta * F_Hat (J + Len);
+            F_Hat (J + Len) := F_Hat (J) - T;
+            F_Hat (J)       := F_Hat (J) + T;
+         end loop;
+      end NTT_Inner;
+
+   begin
+      K     := 1;
+
+      for I in NTT_Len_Bit_Index loop
+         --  When I = 0, Len = 128, Count = 1
+         --       I = 1, Len =  64, Count = 2
+         --       ...
+         --       I = 6, Len =   2, Count = 64
+         Len   := 2**(7 - I);
+         Count := 2**I;
+         for J in I32 range 0 .. Count - 1 loop
+            pragma Loop_Invariant (Count * Len = 128);
+            pragma Loop_Invariant (J * 2 * Len <= 252);
+            pragma Loop_Invariant (I32 (K) = 2**I + J);
+            NTT_Inner (Zeta  => Zeta_ExpC (K),
+                       Start => J * 2 * Len);
+            K := K + 1;
+         end loop;
+
+         --  When the inner loop terminates, K has been
+         --  incremented Count times, therefore...
+         pragma Assert (I32 (K) = 2**I + Count);
+         --  But we know that Count = 2**I, so...
+         pragma Assert (I32 (K) = 2 * 2**I);
+         pragma Assert (I32 (K) = 2**(I + 1));
+         pragma Loop_Invariant (2**(I + 1) <= 128);
+         pragma Loop_Invariant (I32 (K) = 2**(I + 1));
+      end loop;
+      pragma Assert (K = 128);
+   end NTTinp;
+
    --  Overloaded - applies NTT to all elements of V
    function NTT (V : in Poly_Zq_Vector) return NTT_Poly_Zq_Vector
      with No_Inline
@@ -1626,6 +1862,16 @@ is
       end loop;
       return R;
    end NTT;
+
+   --  Overloaded - applies NTTinp to all elements of V
+   procedure NTTinp (V : in out Poly_Zq_Vector)
+     with No_Inline
+   is
+   begin
+      for I in V'Range loop
+         NTTinp (V (I));
+      end loop;
+   end NTTinp;
 
    --  Algorithm 9
    function NTT_Inv (F : in NTT_Poly_Zq) return Poly_Zq
@@ -1866,11 +2112,17 @@ is
       Generate_Poly_Zq_Vector_With_Eta_2 (Random_R, E1);
 
       E2 := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, K * 2));
-      R_Hat := NTT (R);
+
+--      R_Hat := NTT (R);
+      NTTinp (R);
+      R_Hat := (0 => NTT_Poly_Zq (R (0)),
+                1 => NTT_Poly_Zq (R (1)),
+                2 => NTT_Poly_Zq (R (2)));
 
       U := NTT_Inv (Transpose (A_Hat) * R_Hat) + E1;
 
-      Mu := Decompress1 (ByteDecode1 (M));
+--      Mu := Decompress1 (ByteDecode1 (M));
+      Mu := ByteDecodeAndDecompress1 (M);
       V := NTT_Inv (T_Hat * R_Hat) + E2 + Mu;
 
       C1 := ByteEncodeDU (CompressDU (U));
@@ -1901,7 +2153,8 @@ is
 
       W := V - NTT_Inv (S_Hat * NTT (U));
 
-      M := ByteEncode1 (Compress1 (W));
+--      M := ByteEncode1 (Compress1 (W));
+      M := CompressAndEncode1 (W);
       return M;
    end K_PKE_Decrypt;
 
@@ -1972,7 +2225,7 @@ is
       --       nothing to do here.
       --    2. Modulus check - check that Decode/Encode is idempotent:
       Decoded := ByteDecode12 (Key_To_Check);
-      Reencoded := ByteEncode12 (Decoded);
+      Reencoded := ByteEncode12New (Decoded);
       return Byte_Seq_Equal (Key_To_Check, Reencoded);
    end EK_Is_Valid_For_Encaps;
 
@@ -2060,5 +2313,15 @@ is
       pragma Unreferenced (K_Bar);
       return Result;
    end MLKEM_Decaps;
+
+   procedure Test
+   is
+      R : U8_Bit;
+   begin
+      for I in Zq.T loop
+         R := Compress1 (I);
+         Put_Line (I'Img & R'Img);
+      end loop;
+   end Test;
 
 end MLKEM;

@@ -116,6 +116,9 @@ is
                      --  Precondition from FIPS 203 lines 1009 - 1014
           Pre    => C'Length = 32 * (DU * K + DV) and
                     DK'Length = 768 * K + 96;
+
+   procedure Test;
+
 private
    subtype U16 is Unsigned_16;
    subtype U32 is Unsigned_32;
