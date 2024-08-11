@@ -707,5 +707,17 @@ is
       return T * Recip128_Mod_Q;
    end NTT_Invsr;
 
+   function OldMul (A, B : in U32) return U32
+   is
+   begin
+      return (A * B) mod 3329;
+   end OldMul;
+
+   function NewMul (A, B : in U32) return U32
+   is
+      M : constant U32 := A * B;
+   begin
+      return M - (Shift_Right ((M * 315), 20) * 3329);
+   end NewMul;
 
 end ENTT;

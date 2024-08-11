@@ -1,12 +1,24 @@
 with ENTT; use ENTT;
+with NTT32;
 with Ada.Text_IO; use Ada.Text_IO;
 procedure TNTT
 is
    P1, P2, P3 : Poly_Zq;
    P4, P5 : Poly_Zq;
-begin
-   P1 := (others => 5);
 
+   PN, PM : NTT32.Poly_Zq;
+begin
+   for I in PN'Range loop
+     PN (I) := I;
+   end loop;
+
+   PM := NTT32.NTT (PN);
+
+   for I in PN'Range loop
+      Put_Line (PM (I)'Img);
+   end loop;
+
+   P1 := (others => 5);
 
    for I in 1 .. 100_000 loop
 --      P3 := P1;

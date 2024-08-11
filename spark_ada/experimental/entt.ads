@@ -13,6 +13,7 @@ is
    QINV : constant := -3327;
 
    subtype Byte is Unsigned_8;
+   subtype U32  is Unsigned_32;
    subtype I32  is Integer_32;
    subtype N32  is I32 range 0 .. I32'Last;
 
@@ -86,4 +87,12 @@ is
    function NTT_Invsr (F : in Poly_Zq) return Poly_Zq
      with Global => null,
           No_Inline;
+
+
+   function OldMul (A, B : in U32) return U32
+     with Global => null;
+
+   function NewMul (A, B : in U32) return U32
+     with Global => null;
+
 end ENTT;
