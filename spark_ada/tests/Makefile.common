@@ -38,6 +38,10 @@ tkeygen: tkeygen.gpr tkeygen.adb ../lib/libmlkem.a
 	@echo "--- Building tkeygen---"
 	gprbuild -Ptkeygen -XMLKEM_HOSTOS=$(HOSTOS)
 
+tflame: tflame.gpr tflame.adb ../lib/libmlkem.a
+	@echo "--- Building tflame---"
+	gprbuild -Ptflame -XMLKEM_HOSTOS=$(HOSTOS)
+
 ../libkeccak/lib/generic_none/libkeccak.a: ../libkeccak/src/common/*.ads ../libkeccak/src/common/*.adb
 	@echo "--- Building libkeccak ---"
 	cd ../libkeccak; alr build
