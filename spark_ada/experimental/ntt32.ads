@@ -16,9 +16,12 @@ is
 
    subtype Byte is Unsigned_8;
    subtype I32  is Integer_32;
+   subtype I64  is Integer_64;
+   subtype U32  is Unsigned_32;
    subtype N32  is I32 range 0 .. I32'Last;
 
-   subtype Zq is N32 range 0 .. (Q - 1);
+   subtype ZqI32 is I32 range 0 .. (Q - 1);
+   subtype ZqU32 is U32 range 0 .. (Q - 1);
 
    subtype Index_256 is I32 range 0 .. 255;
 
@@ -39,7 +42,7 @@ is
    --====================
 
    procedure NTT_Inner (F_Hat : in out Poly_Zq;
-                        Zeta  : in     Zq;
+                        Zeta  : in     ZqI32;
                         Start : in     Index_256;
                         Len   : in     Len_T)
        with No_Inline,
@@ -52,4 +55,9 @@ is
      with Global => null,
           No_Inline;
 
+
+   function MZq (Left, Right : in ZqU32) return ZqU32
+     with Global => null,
+          No_Inline,
+          Post => MZq'Result = ZqU32 ((Left * Right) mod Q);
 end NTT32;

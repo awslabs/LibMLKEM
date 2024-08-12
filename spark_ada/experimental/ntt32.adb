@@ -18,7 +18,7 @@ is
 --         (for some I in 2 .. 8 => NTT_Slice_Length = 2**I);
 
    subtype SU7 is Byte range 0 .. 127;
-   type Zeta_Exp_Table_Type is array (SU7) of Zq;
+   type Zeta_Exp_Table_Type is array (SU7) of ZqI32;
 
    Zeta_ExpC : constant Zeta_Exp_Table_Type :=
      (0 => 1,
@@ -151,9 +151,10 @@ is
       127 => 2154);
 
    procedure NTT_Inner (F_Hat : in out Poly_Zq;
-                        Zeta  : in     Zq;
+                        Zeta  : in     ZqI32;
                         Start : in     Index_256;
                         Len   : in     Len_T)
+     with SPARK_Mode => Off
    is
       procedure P1
         with No_Inline
@@ -182,14 +183,15 @@ is
    end NTT_Inner;
 
    procedure NTT_Inner128 (F_Hat : in out Poly_Zq;
-                           Zeta  : in     Zq)
-     with No_Inline
+                           Zeta  : in     ZqI32)
+     with No_Inline,
+          SPARK_Mode => Off
    is
       procedure P1
         with No_Inline
       is
          subtype TP is UPoly_I32 (0 .. 127);
-         T     : Zq;
+         T     : ZqI32;
          T_Pos : TP;
          T_Neg : TP;
       begin
@@ -220,6 +222,7 @@ is
    end NTT_Inner128;
 
    function NTT (F : in Poly_Zq) return Poly_Zq
+     with SPARK_Mode => Off
    is
       F_Hat : Poly_Zq;
    begin
@@ -279,4 +282,118 @@ is
 
       return F_Hat;
    end NTT;
+
+   function MZq (Left, Right : in ZqU32) return ZqU32
+   is
+      C     : constant := 2**20;
+      Magic : constant := C / Q + 1;
+      subtype Zq_Product is U32 range 0 .. ((Q - 1) ** 2);
+      R1     : Zq_Product;
+      R2     : U32;
+
+      R, R3, R4 : U32;
+   begin
+      R1 := Left * Right;
+
+      pragma Assert (((R1 / Q) * Q) <= R1); --  L1
+      pragma Assume ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) /= R1))); -- L2
+
+      --  L1 and L2 combine to conclude
+      pragma Assert ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) < R1)));
+
+      --  We need to prove a lower bound on (R1 / Q) * Q
+      pragma Assert ((if Left = 0 or Right = 0 then R1 = 0));
+      pragma Assert ((if Left /= 0 and Right /= 0 then ((R1 / Q) * Q) + Q > R1));
+
+      --  Rearrange...
+      pragma Assert ((if Left /= 0 and Right /= 0 then R1 < ((R1 / Q) * Q) + Q));
+
+      --  Multiply top and bottom of the division by C...
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 < U32 (Q + (((I64 (R1) * C) / (Q * C)) * Q)));
+
+      --  Rearrange...
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 < U32 (Q + (((I64 (R1) * ((C / Q) + 1)) / C) * Q)));
+
+      R2 := R1 * Magic;
+
+      --  Substitute R1 * ((C / Q) + 1) = R1 * Magic = R2
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 < Q + ((R2 / C) * Q));
+
+      --  Shift right by 20 bits
+      R3 := R2 / C;
+
+      --  Substitute R2 / C = R3
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 < Q + (R3 * Q));
+
+      R4 := R3 * Q;
+
+
+      --- NEW  -----
+
+
+      pragma Assert (((R1 * ((C / Q) + 1)) / C) * Q = (R1 / Q) * Q);
+      pragma Assert (((R1 * Magic) / C) * Q = (R1 / Q) * Q);
+      pragma Assert ((R2 / C) * Q = (R1 / Q) * Q);
+      pragma Assert (R3 * Q = (R1 / Q) * Q);
+      pragma Assert (R4 = (R1 / Q) * Q);
+      --------------------
+
+      --  Substitute R3 * Q = R4
+      pragma Assert (if Left = 0 or Right = 0 then R1 = 0 and R4 = 0 and R1 >= R4);
+      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) < Q + I64 (R4));
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 > (R1 / Q) * Q);
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 > ((R1 * C) / (Q * C)) * Q);
+
+      --  Add (R1 / C) to both sides
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > (((R1 * C) / (Q * C)) * Q) + (R1 / C));
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * (C / Q)) / C) * Q + (R1 / C));
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * (C / Q) + R1) / C) * Q);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * ((C / Q) + 1)) / C) * Q);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * Magic) / C) * Q);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > (R2 / C) * Q);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > R3 * Q);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > R4);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 > R4 - (R1 / C));
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4 - (R1 / C) + 1);
+
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4);
+
+
+--      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= ((R1 * Magic) / C) * Q);
+--      pragma Assert (R1 >= (R2 / C) * Q);
+--      pragma Assert (R1 >= R3 * Q);
+      pragma Assert (R1 >= R4);
+
+      --  and therefore R1 - R4 < Q
+      R := R1 - R4;
+
+      pragma Assert (if Left = 0 or Right = 0 then R = 0);
+--      pragma Assert (if Left /= 0 and Right /= 0 then R1 - R4 >= 0);
+      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) - I64 (R4) >= 0);
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4);
+      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) - I64 (R4) < Q);
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 - R4 < Q);
+      pragma Assert (if Left /= 0 and Right /= 0 then R < Q);
+
+      -- Finally, we can combine the two cases to conclude
+      pragma Assert (R < Q);
+
+      --  so can be safely converted to type T,
+      --  and the answer is correct
+      pragma Assert (if Left = 0 or Right = 0 then R = 0);
+      pragma Assert (if Left /= 0 and Right /= 0 then ZqU32 (R) = ZqU32 (R1 mod Q));
+      pragma Assert (ZqU32 (R) = ZqU32 (R1 mod Q));
+      return ZqU32 (R);
+   end MZq;
+
 end NTT32;
