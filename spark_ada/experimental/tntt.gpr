@@ -17,14 +17,16 @@ is
          "-fdata-sections");    -- Create a linker section for each data
    end Compiler;
 
+
    package Prove is
       for Proof_Switches ("Ada") use ("--proof=per_path",
                                       "-j8",
                                       "--no-global-generation",
                                       "--no-inlining",
                                       "--no-loop-unrolling",
-                                      "--level=2",
-                                      "--prover=z3,cvc5,altergo",
+                                      "--level=1",
+                                      "--prover=z3,cvc4,altergo",
+                                      "--timeout=5",
                                       "--memlimit=0",
                                       "--steps=50000",
                                       "--report=statistics");

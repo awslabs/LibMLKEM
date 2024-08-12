@@ -159,26 +159,26 @@ is
       T : Mont_Range;
    begin
       for J in Index_256 range 0 .. 127 loop
-         --  Elements 0 though J - 1 have been modified
-         pragma Loop_Invariant
-            (for all K in Index_256 range 0 .. J - 1 =>
-              (F_Hat (K) in Mont_Range2));
-         --  Elements J though 127 have NOT been modified
-         pragma Loop_Invariant
-            (for all K in Index_256 range J .. 127 =>
-              (F_Hat (K) in Mont_Range));
-         --  Elements 128 though J + 127 have been modified
-         pragma Loop_Invariant
-            (for all K in Index_256 range 128 .. J + 127 =>
-              (F_Hat (K) in Mont_Range2));
-         --  Elements J + 128 though 255 have NOT been modified
-         pragma Loop_Invariant
-            (for all K in Index_256 range J + 128 .. 255 =>
-              (F_Hat (K) in Mont_Range));
-
          T := FQMul (Zeta, F_Hat (J + 128));
          F_Hat (J + 128) := F_Hat (J) - T;
          F_Hat (J)       := F_Hat (J) + T;
+
+         --  Elements 0 though J have been modified
+         pragma Loop_Invariant
+            (for all K in Index_256 range 0 .. J =>
+              (F_Hat (K) in Mont_Range2));
+         --  Elements J + 1 through 127 have NOT been modified
+         pragma Loop_Invariant
+            (for all K in Index_256 range J + 1 .. 127 =>
+              (F_Hat (K) in Mont_Range));
+         --  Elements 128 though J + 128 have been modified
+         pragma Loop_Invariant
+            (for all K in Index_256 range 128 .. J + 128 =>
+              (F_Hat (K) in Mont_Range2));
+         --  Elements J + 129 though 255 have NOT been modified
+         pragma Loop_Invariant
+            (for all K in Index_256 range J + 129 .. 255 =>
+              (F_Hat (K) in Mont_Range));
 
       end loop;
 
@@ -202,11 +202,16 @@ is
                           Start : in     Index_256)
        with No_Inline,
             Global => null,
-            Pre    => Start <= 128 and
-                      (Start = 0 or Start = 128) and
-                      (for all K in Index_256 => F_Hat (K) in Mont_Range2),
-            Post   => (for all K in Index_256 => F_Hat (K) in Mont_Range3);
-
+            Pre    => Start <= 128 and then
+                      --  The elements about to be modified are in Mont_Range2
+                      ((for all K in Index_256 range Start       .. Start +  63 => (F_Hat (K) in Mont_Range2)) and
+                       (for all K in Index_256 range Start +  64 .. Start + 127 => (F_Hat (K) in Mont_Range2))),
+            Post   => --  The elements that HAVE been modified are now in Mont_Range3
+                      (for all K in Index_256 range Start       .. Start +  63 => (F_Hat (K) in Mont_Range3)) and
+                      (for all K in Index_256 range Start +  64 .. Start + 127 => (F_Hat (K) in Mont_Range3)) and
+                      --  Unmodified elements preserve their initial value (and range)
+                      (for all K in Index_256 range     0       .. Start -   1 => (F_Hat (K) = F_Hat'Old (K))) and
+                      (for all K in Index_256 range Start + 128 .. 255         => (F_Hat (K) = F_Hat'Old (K)));
 
    procedure NTT_Inner64 (F_Hat : in out Poly_Zq;
                           Zeta  : in     Zeta_Range;
@@ -222,40 +227,30 @@ is
          --  Elements 0 though Start - 1 have NOT been modified
          pragma Loop_Invariant
             (for all K in Index_256 range 0 .. Start - 1 =>
-              (F_Hat (K) in Mont_Range2));
+              (F_Hat (K) = F_Hat'Loop_Entry (K)));
 
-         --  Elements Start though Start + J have been modified
+         --  Elements Start though J have been modified
          pragma Loop_Invariant
-            (for all K in Index_256 range Start .. Start + J =>
+            (for all K in Index_256 range Start .. J =>
               (F_Hat (K) in Mont_Range3));
 
-         --  Elements Start + J + 1though Start + 63 have NOT been modified
+         --  Elements Start + J + 1 through Start + 63 have NOT been modified
          pragma Loop_Invariant
-            (for all K in Index_256 range Start + J + 1 .. Start + 63 =>
-              (F_Hat (K) in Mont_Range2));
+            (for all K in Index_256 range J + 1 .. Start + 63 =>
+              (F_Hat (K) = F_Hat'Loop_Entry (K)));
 
-         --  Elements Start + 64 though Start + J + 64 have been modified
+         --  Elements Start + 64 though J + 64 have been modified
          pragma Loop_Invariant
-            (for all K in Index_256 range Start + 64 .. Start + 64 + J =>
+            (for all K in Index_256 range Start + 64 .. J + 64 =>
               (F_Hat (K) in Mont_Range3));
 
-         --  Elements Start + 64 + J + 1 though 255 have NOT been modified
+         --  Elements J + 65 though 255 have NOT been modified
          pragma Loop_Invariant
-            (for all K in Index_256 range Start + 64 + J + 1 .. 255 =>
-              (F_Hat (K) in Mont_Range2));
+            (for all K in Index_256 range J + 65 .. 255 =>
+              (F_Hat (K) = F_Hat'Loop_Entry (K)));
 
       end loop;
-
-      --  substitute J = Start + 64 into that
-      pragma Assert (for all K in Index_256 range 0 .. Start - 1 =>
-                      (F_Hat (K) in Mont_Range2));
-      pragma Assert (for all K in Index_256 range Start .. Start + 63 =>
-                      (F_Hat (K) in Mont_Range3));
-      pragma Assert (for all K in Index_256 range Start + 64 .. Start + 127 =>
-                      (F_Hat (K) in Mont_Range3));
-      pragma Assert (for all K in Index_256 range Start + 128 .. 255 =>
-                      (F_Hat (K) in Mont_Range2));
-
+      --  substitute J = Start + 63 into each loop invariant to get the postcondition
    end NTT_Inner64;
 
 
@@ -264,6 +259,7 @@ is
 
 
    procedure NTTu (F : in out Poly_Zq)
+--      with SPARK_Mode => Off
    is
    begin
       NTT_Inner128 (F_Hat => F,
@@ -274,10 +270,22 @@ is
       NTT_Inner64 (F_Hat => F,
                    Zeta  => Zeta_ExpC (2),
                    Start => 0);
+
+      --  Substitute Start = 0 into the post-condition of NTT_Inner64 and simplify to get:
+      pragma Assert ((for all K in Index_256 range 0   ..  63 => (F (K) in Mont_Range3)) and
+                     (for all K in Index_256 range 64  .. 127 => (F (K) in Mont_Range3)) and
+                     (for all K in Index_256 range 128 .. 255 => (F (K) in Mont_Range2)));
+
       NTT_Inner64 (F_Hat => F,
                    Zeta  => Zeta_ExpC (3),
                    Start => 128);
 
+      --  Substitute Start = 128 into the post-condition of NTT_Inner64 and simplify to get:
+      pragma Assert ((for all K in Index_256 range 128 .. 191 => (F (K) in Mont_Range3)) and
+                     (for all K in Index_256 range 192 .. 255 => (F (K) in Mont_Range3)) and
+                     (for all K in Index_256 range 0   .. 127 => (F (K) in Mont_Range3))); -- from above
+
+      --  Therefore, ALL elements of F are in Mont_Range3
       pragma Assert (for all I in F'Range => F (I) in Mont_Range3);
 
       --------------
