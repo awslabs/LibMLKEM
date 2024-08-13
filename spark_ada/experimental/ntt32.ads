@@ -60,4 +60,5 @@ is
      with Global => null,
           No_Inline,
           Post => MZq'Result = ZqU32 ((Left * Right) mod Q);
+
 end NTT32;

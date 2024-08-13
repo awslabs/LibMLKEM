@@ -287,111 +287,87 @@ is
    is
       C     : constant := 2**20;
       Magic : constant := C / Q + 1;
+
       subtype Zq_Product is U32 range 0 .. ((Q - 1) ** 2);
       R1     : Zq_Product;
       R2     : U32;
 
-      R, R3, R4 : U32;
+      R3, R4 : U32;
+      R : I32;
    begin
       R1 := Left * Right;
+      R2 := R1 * Magic;
+      --  Shift right by 20 bits
+      R3 := R2 / C;
+      R4 := R3 * Q;
 
       pragma Assert (((R1 / Q) * Q) <= R1); --  L1
       pragma Assume ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) /= R1))); -- L2
-
       --  L1 and L2 combine to conclude
-      pragma Assert ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) < R1)));
+      pragma Assert ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) < R1)));  -- L3
 
+
+      --========
+      --  Upper-bound on R1 - R4
+      --========
       --  We need to prove a lower bound on (R1 / Q) * Q
-      pragma Assert ((if Left = 0 or Right = 0 then R1 = 0));
       pragma Assert ((if Left /= 0 and Right /= 0 then ((R1 / Q) * Q) + Q > R1));
-
       --  Rearrange...
       pragma Assert ((if Left /= 0 and Right /= 0 then R1 < ((R1 / Q) * Q) + Q));
-
       --  Multiply top and bottom of the division by C...
       pragma Assert (if Left /= 0 and Right /= 0 then R1 < U32 (Q + (((I64 (R1) * C) / (Q * C)) * Q)));
-
       --  Rearrange...
       pragma Assert (if Left /= 0 and Right /= 0 then R1 < U32 (Q + (((I64 (R1) * ((C / Q) + 1)) / C) * Q)));
-
-      R2 := R1 * Magic;
-
       --  Substitute R1 * ((C / Q) + 1) = R1 * Magic = R2
       pragma Assert (if Left /= 0 and Right /= 0 then R1 < Q + ((R2 / C) * Q));
-
-      --  Shift right by 20 bits
-      R3 := R2 / C;
-
       --  Substitute R2 / C = R3
       pragma Assert (if Left /= 0 and Right /= 0 then R1 < Q + (R3 * Q));
-
-      R4 := R3 * Q;
-
-
-      --- NEW  -----
-
-
-      pragma Assert (((R1 * ((C / Q) + 1)) / C) * Q = (R1 / Q) * Q);
-      pragma Assert (((R1 * Magic) / C) * Q = (R1 / Q) * Q);
-      pragma Assert ((R2 / C) * Q = (R1 / Q) * Q);
-      pragma Assert (R3 * Q = (R1 / Q) * Q);
-      pragma Assert (R4 = (R1 / Q) * Q);
-      --------------------
-
       --  Substitute R3 * Q = R4
-      pragma Assert (if Left = 0 or Right = 0 then R1 = 0 and R4 = 0 and R1 >= R4);
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 < Q + R4);
       pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) < Q + I64 (R4));
+      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) - I64 (R4) < Q);
 
+      --  Left = 0 or Right = 0 case
+      pragma Assert ((if Left = 0 or Right = 0 then R1 = 0 and R4 = 0 and R1 - R4 < Q));
+
+
+      --========
+      --  Lower-bound on R1 - R4
+      --========
+
+      -- Re-arrange L3
       pragma Assert (if Left /= 0 and Right /= 0 then R1 > (R1 / Q) * Q);
+
+      -- Multiply top and bottom of division by C
       pragma Assert (if Left /= 0 and Right /= 0 then R1 > ((R1 * C) / (Q * C)) * Q);
 
-      --  Add (R1 / C) to both sides
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > (((R1 * C) / (Q * C)) * Q) + (R1 / C));
+      --  Add Q to both sides
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > (((R1 * C) / (Q * C)) * Q) + Q);
+      --  Rearrange
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > (((R1 * (C / Q)) / C) * Q) + Q);
+      --  Rearrange
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > (((R1 * ((C / Q) + 1)) / C) * Q));
+      --  Substitute (C / Q) + 1 = Magic
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > (((R1 * Magic) / C) * Q));
+      --  Substitute R1 * Magic = R2
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > ((R2 / C) * Q));
+      --  Substitute R2 / C = R3
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > (R3 * Q));
+      --  Substitute R3 * Q = R4
+      pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > R4);
 
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * (C / Q)) / C) * Q + (R1 / C));
+      -- R1 - R4 might be negative, so switch it signed 32-bit integers here
+      R := I32 (R1) - I32 (R4);
 
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * (C / Q) + R1) / C) * Q);
+      pragma Assert (R > -Q and R < Q);
 
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * ((C / Q) + 1)) / C) * Q);
+      --  If R negative then add Q to get it back into 0 .. Q - 1
+      R := R + Q * (Boolean'Pos (R < 0));
 
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > ((R1 * Magic) / C) * Q);
+      --  so can be safely converted to type ZqU32
+      pragma Assert (R >= 0 and R < Q);
 
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > (R2 / C) * Q);
-
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > R3 * Q);
-
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 + (R1 / C) > R4);
-
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 > R4 - (R1 / C));
-
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4 - (R1 / C) + 1);
-
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4);
-
-
---      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= ((R1 * Magic) / C) * Q);
---      pragma Assert (R1 >= (R2 / C) * Q);
---      pragma Assert (R1 >= R3 * Q);
-      pragma Assert (R1 >= R4);
-
-      --  and therefore R1 - R4 < Q
-      R := R1 - R4;
-
-      pragma Assert (if Left = 0 or Right = 0 then R = 0);
---      pragma Assert (if Left /= 0 and Right /= 0 then R1 - R4 >= 0);
-      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) - I64 (R4) >= 0);
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 >= R4);
-      pragma Assert (if Left /= 0 and Right /= 0 then I64 (R1) - I64 (R4) < Q);
-      pragma Assert (if Left /= 0 and Right /= 0 then R1 - R4 < Q);
-      pragma Assert (if Left /= 0 and Right /= 0 then R < Q);
-
-      -- Finally, we can combine the two cases to conclude
-      pragma Assert (R < Q);
-
-      --  so can be safely converted to type T,
       --  and the answer is correct
-      pragma Assert (if Left = 0 or Right = 0 then R = 0);
-      pragma Assert (if Left /= 0 and Right /= 0 then ZqU32 (R) = ZqU32 (R1 mod Q));
       pragma Assert (ZqU32 (R) = ZqU32 (R1 mod Q));
       return ZqU32 (R);
    end MZq;
