@@ -1889,22 +1889,23 @@ is
                            C        : in Ciphertext) return Bytes_32
      with No_Inline
    is
-      C1    : Poly_UDU_Bytes;
-      C2    : Bytes_UDV;
-      U     : Poly_Zq_Vector;
-      S_Hat : NTT_Poly_Zq_Vector;
-      V, W  : Poly_Zq;
-      M     : Bytes_32;
+      C1     : Poly_UDU_Bytes;
+      C2     : Bytes_UDV;
+      U_Tick : Poly_Zq_Vector;
+      S_Hat  : NTT_Poly_Zq_Vector;
+      V_Tick : Poly_Zq;
+      W      : Poly_Zq;
+      M      : Bytes_32;
    begin
       C1 := C (0 .. 32 * DU * K - 1); --  calls _memcpy()
       C2 := C (32 * DU * K .. 32 * (DU * K + DV) - 1);
 
-      U := DecompressDU (ByteDecodeDU (C1));
-      V := DecompressDV (ByteDecodeDV (C2));
+      U_Tick := DecompressDU (ByteDecodeDU (C1));
+      V_Tick := DecompressDV (ByteDecodeDV (C2));
 
       S_Hat := ByteDecode12 (DK_PKE);
 
-      W := V - NTT_Inv (S_Hat * NTT (U));
+      W := V_Tick - NTT_Inv (S_Hat * NTT (U_Tick));
 
       M := ByteEncode1 (Compress1 (W));
       return M;
