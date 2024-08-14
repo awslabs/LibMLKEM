@@ -397,10 +397,10 @@ is
 
    ----------------------------------
    --  BitsToBytes and BytesToBits
-   --  See FIPS 203 4.2.1, 755 - 763
+   --  See FIPS 203 4.2.1
    ----------------------------------
 
-   --  Algorithm 2
+   --  Algorithm 3
    --  BitsToBytes is generic here over its parameter and return types
    --  so that each instantiation of it has definite/constrained types.
    --  This avoids the need for unconstrained parameters and return types,
@@ -421,7 +421,7 @@ is
                     Generic_BitsToBytes'Result'Length * 8 = B'Length and
                     Generic_BitsToBytes'Result'Length = B'Length / 8;
 
-   --  Algorithm 3
+   --  Algorithm 4
    --  Similarly, BytesToBits is generic to avoid unconstrained types
    generic
       type Bytes_Index is range <>;
@@ -520,7 +520,7 @@ is
 
    ----------------------------------
    --  Pseudo-Random Function
-   --  See FIPS 203 4.1, 726 - 731
+   --  See FIPS 203 4.1
    ----------------------------------
 
    function PRF_Eta_1 (S : in Bytes_32;
@@ -552,11 +552,11 @@ is
    end PRF_Eta_2;
 
    --  The function XOF is declared below
-   --  as part of Algorithm 6
+   --  as part of Algorithm 7
 
    ----------------------------------
    --  Hash functions, built on SHA3
-   --  See FIPS 203 4.1, 741 - 750
+   --  See FIPS 203 4.1
    ----------------------------------
 
    --  G returns a (32 bytes) followed by b (32 bytes)
@@ -850,7 +850,7 @@ is
    end DecompressDU;
 
    -------------------------------------------------------
-   --  Byte Encoding (Algorithm 4) and Decoding (Algorithm 5)
+   --  Byte Encoding (Algorithm 5) and Decoding (Algorithm 6)
    --  Each function is declared overloaded several times
    --  for specific values of d and parameter types.
    -------------------------------------------------------
@@ -1402,7 +1402,7 @@ is
 
 
 
-   --  Algorithm 6 - SampleNTT and XOF
+   --  Algorithm 7 - SampleNTT and XOF
    --  For this implementation, we combine XOF and SampleNTT
    --  into a single function. This avoids the need for XOF
    --  to return an unbounded sequence of bytes and/or some
@@ -1446,7 +1446,7 @@ is
    end XOF_Then_SampleNTT;
 
 
-   --  Algorithm 7 - SamplePolyCBD2, specialized for Eta_1
+   --  Algorithm 8 - SamplePolyCBD2, specialized for Eta_1
    function SamplePolyCBD_Eta_1 (B : in PRF_Eta_1_Bytes) return Poly_Zq
      with No_Inline
    is
@@ -1503,7 +1503,7 @@ is
       return F;
    end SamplePolyCBD_Eta_1;
 
-   --  Algorithm 7 - SamplePolyCBD2, specialized for Eta_2
+   --  Algorithm 8 - SamplePolyCBD2, specialized for Eta_2
    function SamplePolyCBD_Eta_2 (B : in PRF_Eta_2_Bytes) return Poly_Zq
      with No_Inline
    is
@@ -1560,7 +1560,7 @@ is
    end SamplePolyCBD_Eta_2;
 
 
-   --  Algorithm 8
+   --  Algorithm 9
    function NTT (F : in Poly_Zq) return NTT_Poly_Zq
      with No_Inline
    is
@@ -1632,7 +1632,7 @@ is
       return R;
    end NTT;
 
-   --  Algorithm 9
+   --  Algorithm 10
    function NTT_Inv (F : in NTT_Poly_Zq) return Poly_Zq
      with No_Inline
    is
@@ -1704,7 +1704,7 @@ is
    end NTT_Inv;
 
 
-   --  Algorithms 10 and 11
+   --  Algorithms 11 and 12
    --  BaseCaseMultiply is inlined here in MultiplyNTTs
    function MultiplyNTTs (F, G : in NTT_Poly_Zq) return NTT_Poly_Zq
      with No_Inline
@@ -1727,7 +1727,7 @@ is
       return H;
    end MultiplyNTTs;
 
-   --  FIPS 203, line 530, equation 1 defines a "dot product" operator between
+   --  FIPS 203 2.4.7 defines a "dot product" operator between
    --  matrices and vectors of Poly_Zq, so we declare it thus:
    function "*" (Left  : in NTT_Poly_Matrix;
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq_Vector
@@ -1743,7 +1743,7 @@ is
       return R; --  calls _memcpy()
    end "*";
 
-   --  Dot product of K-length vectors of NTT_Poly_Zq. FIPS 203 line 530,
+   --  Dot product of K-length vectors of NTT_Poly_Zq.
    --  third equation
    function "*" (Left  : in NTT_Poly_Zq_Vector;
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq
@@ -1844,11 +1844,11 @@ is
       end loop;
    end Generate_Poly_Zq_Vector_With_Eta_2;
 
-   --  Algorithm 12, FIPS 203 5.1
+   --  Algorithm 13, FIPS 203 5.1
    function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
      is separate;
 
-   --  Algorithm 13, FIPS 203 5.2
+   --  Algorithm 14, FIPS 203 5.2
    function K_PKE_Encrypt (EK_PKE   : in PKE_Encryption_Key;
                            M        : in Bytes_32;
                            Random_R : in Bytes_32) return Ciphertext
@@ -1884,7 +1884,7 @@ is
    end K_PKE_Encrypt;
 
 
-   --  Algorithm 14, FIPS 203 5.2
+   --  Algorithm 15, FIPS 203 5.3
    function K_PKE_Decrypt (DK_PKE   : in PKE_Decryption_Key;
                            C        : in Ciphertext) return Bytes_32
      with No_Inline
@@ -1972,7 +1972,7 @@ is
       Decoded      : NTT_Poly_Zq_Vector;
       Reencoded    : Poly_Zq_Vector_Bytes;
    begin
-      --  FIPS 203 6.2 line 980 - 997
+      --  FIPS 203 7.2 - Encapsulation key check
       --    1. Check on the length of EK is a static type-check in SPARK, so
       --       nothing to do here.
       --    2. Modulus check - check that Decode/Encode is idempotent:
