@@ -1947,6 +1947,7 @@ is
    --  Exported subprogram bodies
    --=======================================
 
+   -- This is also ML-KEM.KeyGen_internal from FIPS 203 Algorithm 16
    function MLKEM_KeyGen (Random_D : in Bytes_32;
                           Random_Z : in Bytes_32) return MLKEM_Key
    is
@@ -1966,6 +1967,7 @@ is
    end MLKEM_KeyGen;
 
 
+   --  FIPS 203 section 7.2
    function EK_Is_Valid_For_Encaps (EK : in MLKEM_Encapsulation_Key)
      return Boolean
    is
@@ -1983,18 +1985,20 @@ is
    end EK_Is_Valid_For_Encaps;
 
 
+   -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 17
    procedure MLKEM_Encaps (EK       : in     MLKEM_Encapsulation_Key;
                            Random_M : in     Bytes_32;
-                           SS       :    out Bytes_32;
+                           K        :    out Bytes_32;
                            C        :    out Ciphertext)
    is
       KR : Bytes_64;
    begin
       KR := G (Random_M & H (EK));
-      SS := KR (0 .. 31);
+      K  := KR (0 .. 31);
       C  := K_PKE_Encrypt (EK, Random_M, Bytes_32 (KR (32 .. 63))); --  calls _memcpy()
    end MLKEM_Encaps;
 
+   -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 18
    function MLKEM_Decaps (C  : in Ciphertext;
                           DK : in MLKEM_Decapsulation_Key) return Bytes_32
    is
