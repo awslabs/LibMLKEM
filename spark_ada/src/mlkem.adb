@@ -1855,8 +1855,8 @@ is
    is
       A_Hat : NTT_Poly_Matrix;
 
-      R, E1, U     : Poly_Zq_Vector;
-      R_Hat, T_Hat : NTT_Poly_Zq_Vector;
+      Y, E1, U     : Poly_Zq_Vector;
+      Y_Hat, T_Hat : NTT_Poly_Zq_Vector;
 
       E2, V, Mu : Poly_Zq;
       Rho       : Bytes_32;
@@ -1867,16 +1867,16 @@ is
       Rho := EK_PKE (384 * K .. EK_PKE'Last); --  Should be exactly 32 bytes
 
       Generate_A_Hat_Matrix (Rho, A_Hat);
-      Generate_Poly_Zq_Vector_With_Eta_1 (Random_R, 0, R);
+      Generate_Poly_Zq_Vector_With_Eta_1 (Random_R, 0, Y);
       Generate_Poly_Zq_Vector_With_Eta_2 (Random_R, E1);
 
       E2 := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, K * 2));
-      R_Hat := NTT (R);
+      Y_Hat := NTT (Y);
 
-      U := NTT_Inv (Transpose (A_Hat) * R_Hat) + E1;
+      U := NTT_Inv (Transpose (A_Hat) * Y_Hat) + E1;
 
       Mu := Decompress1 (ByteDecode1 (M));
-      V := NTT_Inv (T_Hat * R_Hat) + E2 + Mu;
+      V := NTT_Inv (T_Hat * Y_Hat) + E2 + Mu;
 
       C1 := ByteEncodeDU (CompressDU (U));
       C2 := ByteEncodeDV (CompressDV (V));
