@@ -5,7 +5,7 @@ with "../mlkem.gpr";
 project TKATs is
 
    for Languages use ("Ada");
-   for Main use ("tkats.adb", "tunlucky.adb", "tmodulus.adb");
+   for Main use ("tkats.adb", "tunlucky.adb", "tmodulus.adb", "tvalidation.adb");
 
    type Host_OS_Kind is ("Darwin", "Linux", "Windows", "generic");
    Host_OS : Host_OS_Kind := external("MLKEM_HOSTOS", "generic");
