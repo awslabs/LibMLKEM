@@ -1407,29 +1407,30 @@ is
    --  into a single function. This avoids the need for XOF
    --  to return an unbounded sequence of bytes and/or some
    --  sort of lazy evaluation of an infinite sequence.
-   function XOF_Then_SampleNTT (Rho : in Bytes_32;
-                                I   : in Byte;
-                                J   : in Byte) return NTT_Poly_Zq
+   subtype Index_34  is I32 range 0 .. 33;
+   subtype Bytes_34  is Byte_Seq (Index_34);
+
+   function XOF_Then_SampleNTT (B : in Bytes_34) return NTT_Poly_Zq
      with No_Inline
    is
-      C  : SHAKE128.Context;
-      J2 : Natural := 0;
-      A  : NTT_Poly_Zq := (others => 0); --  calls _memset()
-      B  : Bytes_3;
+      Ctx : SHAKE128.Context;
+      J2  : Natural := 0;
+      A   : NTT_Poly_Zq := (others => 0); --  calls _memset()
+      C   : Bytes_3;
    begin
       --  Initialize and feed input data into the XOF function
       --  which is actually SHAKE128
-      SHAKE128.Init (C);
-      SHAKE128.Update (C, SHAKE128.Byte_Array (Rho & I & J));
+      SHAKE128.Init (Ctx);
+      SHAKE128.Update (Ctx, SHAKE128.Byte_Array (B));
 
       while J2 < 256 loop
          --  To execute this loop body once, we need exactly 3 bytes of output
          --  from the XOF function, so we fetch that many, and keep
          --  looping until the sampling terminates
-         SHAKE128.Extract (C, SHAKE128.Byte_Array (B));
+         SHAKE128.Extract (Ctx, SHAKE128.Byte_Array (C));
          declare
-            D1  : constant U16 := U16 (B (0)) + (256 * (U16 (B (1)) mod 16));
-            D2  : constant U16 := U16 (B (1)) / 16 + (16 * U16 (B (2)));
+            D1  : constant U16 := U16 (C (0)) + (256 * (U16 (C (1)) mod 16));
+            D2  : constant U16 := U16 (C (1)) / 16 + (16 * U16 (C (2)));
          begin
             if D1 < Q then
                A (Index_256 (J2)) := Zq.T (D1);
@@ -1791,7 +1792,7 @@ is
       --  and element of A_Hat.
       for I in K_Range loop
          for J in K_Range loop
-            A_Hat (I) (J) := XOF_Then_SampleNTT (Rho, Byte (J), Byte (I));
+            A_Hat (I) (J) := XOF_Then_SampleNTT (Rho & Byte (J) & Byte (I));
 
             --  The first I-1 slices of R are fully initialized and
             --  the first J elements of slice I are initialized
