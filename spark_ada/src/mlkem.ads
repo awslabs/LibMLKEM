@@ -85,14 +85,39 @@ is
    end record;
 
    --==============================================
-   --  Exported subprograms. These 4 subprograms
+   --  Exported subprograms. These subprograms
    --  form the main user-facing API for MLKEM
    --==============================================
 
-   --  Input data validation for Algorithm 20.
-   function EK_Is_Valid_For_Encaps (EK : in MLKEM_Encapsulation_Key)
+   --  Input Validation Functions
+
+   --  FIPS 203 section 7.2 - Encapsulation key check
+   function EK_Valid_For_Encaps (EK_Bar : in MLKEM_Encapsulation_Key)
+      return Boolean
+     with Global => null;
+
+   --  FIPS 203 section 7.3 - Decapsulation key check
+   --  NOTE: The "Ciphertext type check" specified in 7.1 (1) is a wholly
+   --  static type-check in SPARK, so does not require a dynamic check here.
+   function DK_Valid_For_Decaps (DK_Bar : in MLKEM_Decapsulation_Key)
      return Boolean
      with Global => null;
+
+   --  FIPS 203 section 7.1 "Key pair check (without seed)"
+   function Key_Pair_Check_Without_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_M : in Bytes_32) return Boolean
+     with Global => null;
+
+   --  FIPS 203 section 7.1 "Key pair check (with seed)"
+   function Key_Pair_Check_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32;
+       Random_M : in Bytes_32) return Boolean
+     with Global => null;
+
+   --  Main MLKEM API
 
    --  Algorithm 19
    function MLKEM_KeyGen (Random_D : in Bytes_32;
@@ -102,12 +127,12 @@ is
    --  Algorithm 20
    procedure MLKEM_Encaps (EK       : in     MLKEM_Encapsulation_Key;
                            Random_M : in     Bytes_32;
-                           SS       :    out Bytes_32;
+                           Key      :    out Bytes_32;
                            C        :    out Ciphertext)
      with Global => null,
                      --  Precondition from FIPS 203
           Pre    => EK'Length = 384 * K + 32 and
-                    EK_Is_Valid_For_Encaps (EK);
+                    EK_Valid_For_Encaps (EK);
 
    --  Algorithm 21
    function MLKEM_Decaps (C  : in Ciphertext;
@@ -115,7 +140,8 @@ is
      with Global => null,
                      --  Precondition from FIPS 203
           Pre    => C'Length = 32 * (DU * K + DV) and
-                    DK'Length = 768 * K + 96;
+                    DK'Length = 768 * K + 96 and
+                    DK_Valid_For_Decaps (DK);
 private
    subtype U16 is Unsigned_16;
    subtype U32 is Unsigned_32;

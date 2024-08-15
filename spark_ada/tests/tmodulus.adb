@@ -105,7 +105,7 @@ is
    is
    begin
       Put (Count'Img);
-      if EK_Is_Valid_For_Encaps (TK.Invalid_PK) then
+      if EK_Valid_For_Encaps (TK.Invalid_PK) then
          Put_Line (" EK is OK - FAIL!");
       else
          Put_Line (" EK is Invalid - PASS");

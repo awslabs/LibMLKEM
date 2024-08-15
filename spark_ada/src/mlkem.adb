@@ -1947,6 +1947,95 @@ is
    --  Exported subprogram bodies
    --=======================================
 
+   --  FIPS 203 section 7.2
+   function EK_Valid_For_Encaps (EK_Bar : in MLKEM_Encapsulation_Key)
+     return Boolean
+   is
+      Key_To_Check : constant Poly_Zq_Vector_Bytes := EK_Bar (0 .. 384 * K - 1);
+      Decoded      : NTT_Poly_Zq_Vector;
+      Reencoded    : Poly_Zq_Vector_Bytes;
+   begin
+      --  FIPS 203 7.2 - Encapsulation key check
+      --    1. Type check. Check on the length of EK is a static type-check in SPARK, so
+      --       nothing to do here.
+      --    2. Modulus check - check that Decode/Encode is idempotent:
+      Decoded := ByteDecode12 (Key_To_Check);
+      Reencoded := ByteEncode12 (Decoded);
+      return Byte_Seq_Equal (Key_To_Check, Reencoded);
+   end EK_Valid_For_Encaps;
+
+   --  FIPS 203 section 7.3 - Decapsulation key and Ciphertext check
+   function DK_Valid_For_Decaps (DK_Bar : in MLKEM_Decapsulation_Key)
+     return Boolean
+   is
+      subtype Hash_Data_Index is I32 range 0 .. 384 * K + 31;
+      subtype Hash_Data is Byte_Seq (Hash_Data_Index);
+
+      HD : constant Hash_Data := Hash_Data (DK_Bar (384 * K .. 768 * K + 31));
+      Test, Reference_Hash : Bytes_32;
+   begin
+      --  FIPS 203 7.3 - Decapsulation key check
+      --    1. Ciphertext type check. This is a static type-check in SPARK,
+      --       so nothing to do here.
+      --    2. Decapsulation key type check. This is a static type-check in
+      --       SPARK, so nothing to do here.
+      --    3. Hash check, as follows:
+      Test           := H (HD);
+      Reference_Hash := Bytes_32 (DK_Bar (768 * K + 32 .. 768 * K + 63));
+
+      return Byte_Seq_Equal (Test, Reference_Hash);
+   end DK_Valid_For_Decaps;
+
+   --  FIPS 203 section 7.1
+   function Key_Pair_Is_Consistent_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32) return Boolean
+   is
+      Regenerated_Key : MLKEM_Key;
+   begin
+      Regenerated_Key := MLKEM_KeyGen (Random_D, Random_Z);
+      return Byte_Seq_Equal (Key_Pair.EK, Regenerated_Key.EK) and
+             Byte_Seq_Equal (Key_Pair.DK, Regenerated_Key.DK);
+   end Key_Pair_Is_Consistent_With_Seed;
+
+
+   --  FIPS 203 section 7.1 "Key pair check (without seed)"
+   function Key_Pair_Check_Without_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_M : in Bytes_32) return Boolean
+   is
+      Key          : Bytes_32;
+      Key_Tick     : Bytes_32;
+      C            : Ciphertext;
+   begin
+      --  We can only call MLKEM_Encaps and MLKEM_Decaps if
+      --  we know that DK and EK really are valid first.
+      if (DK_Valid_For_Decaps (Key_Pair.DK) and
+          EK_Valid_For_Encaps (Key_Pair.EK)) then
+
+         --  Now we can do the Pair-wise consistency check. Section 7.1 (4)
+         MLKEM_Encaps (Key_Pair.EK, Random_M, Key, C);
+         Key_Tick := MLKEM_Decaps (C, Key_Pair.DK);
+         return Byte_Seq_Equal (Key, Key_Tick);
+      else
+         return False;
+      end if;
+   end Key_Pair_Check_Without_Seed;
+
+
+   --  FIPS 203 section 7.1 "Key pair check (with seed)"
+   function Key_Pair_Check_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32;
+       Random_M : in Bytes_32) return Boolean
+   is
+   begin
+      return (Key_Pair_Is_Consistent_With_Seed (Key_Pair, Random_D, Random_Z) and
+              Key_Pair_Check_Without_Seed (Key_Pair, Random_M));
+   end Key_Pair_Check_With_Seed;
+
    -- This is also ML-KEM.KeyGen_internal from FIPS 203 Algorithm 16
    function MLKEM_KeyGen (Random_D : in Bytes_32;
                           Random_Z : in Bytes_32) return MLKEM_Key
@@ -1967,35 +2056,17 @@ is
    end MLKEM_KeyGen;
 
 
-   --  FIPS 203 section 7.2
-   function EK_Is_Valid_For_Encaps (EK : in MLKEM_Encapsulation_Key)
-     return Boolean
-   is
-      Key_To_Check : constant Poly_Zq_Vector_Bytes := EK (0 .. 384 * K - 1); --  calls _memcpy()
-      Decoded      : NTT_Poly_Zq_Vector;
-      Reencoded    : Poly_Zq_Vector_Bytes;
-   begin
-      --  FIPS 203 7.2 - Encapsulation key check
-      --    1. Check on the length of EK is a static type-check in SPARK, so
-      --       nothing to do here.
-      --    2. Modulus check - check that Decode/Encode is idempotent:
-      Decoded := ByteDecode12 (Key_To_Check);
-      Reencoded := ByteEncode12 (Decoded);
-      return Byte_Seq_Equal (Key_To_Check, Reencoded);
-   end EK_Is_Valid_For_Encaps;
-
-
    -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 17
    procedure MLKEM_Encaps (EK       : in     MLKEM_Encapsulation_Key;
                            Random_M : in     Bytes_32;
-                           K        :    out Bytes_32;
+                           Key      :    out Bytes_32;
                            C        :    out Ciphertext)
    is
       KR : Bytes_64;
    begin
-      KR := G (Random_M & H (EK));
-      K  := KR (0 .. 31);
-      C  := K_PKE_Encrypt (EK, Random_M, Bytes_32 (KR (32 .. 63))); --  calls _memcpy()
+      KR  := G (Random_M & H (EK));
+      Key := KR (0 .. 31);
+      C   := K_PKE_Encrypt (EK, Random_M, Bytes_32 (KR (32 .. 63))); --  calls _memcpy()
    end MLKEM_Encaps;
 
    -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 18
