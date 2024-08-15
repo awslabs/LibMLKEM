@@ -52,7 +52,7 @@ begin
       Put_Line ("Corrupt EK check     - PASS");
    end if;
 
-   --  Corrupt K2.EK and try again
+   --  Corrupt K2.DK and try again
    K2 := K1;
    K2.DK (1) := K2.DK (1) + 1;
    if Key_Pair_Check_With_Seed (K2, D, Z, M) then
