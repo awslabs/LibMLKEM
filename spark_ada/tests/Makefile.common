@@ -2,7 +2,7 @@ HOSTOS := $(shell uname -s)
 
 all: diff
 
-diff: new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp unlucky_results.txt unlucky_ref.txt modulus_ref.txt modulus_results.txt
+diff: new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp unlucky_results.txt unlucky_ref.txt modulus_ref.txt modulus_results.txt validation_results.txt
 	@echo "--- Diffing PQShield KAT results - blank response means success  ---"
 	diff new.txt ../../KAT/MLKEM/kat_MLKEM_768.rsp
 	@echo "--- Diffing Unlucky KAT result - blank response means success  ---"
