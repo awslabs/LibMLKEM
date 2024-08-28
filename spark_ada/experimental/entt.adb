@@ -713,11 +713,28 @@ is
       return (A * B) mod 3329;
    end OldMul;
 
+   --  THIS WORKS! 26/8/2024
    function NewMul (A, B : in U32) return U32
    is
       M : constant U32 := A * B;
+      M2 : U32;
+      R : I32;
    begin
-      return M - (Shift_Right ((M * 315), 20) * 3329);
+      pragma Assert (M in 0 .. 11_075_584);
+      M2 := U32 (M) * 315;
+      pragma Assert (M2 in 0 .. 3_488_808_960);
+      M2 := Shift_Right (M2, 20);
+      pragma Assert (M2 in 0 .. 3327);
+      M2 := M2 * 3329;
+      pragma Assert (M2 in 0 .. 11_078_583);
+
+      R := I32 (M) - I32 (M2);
+      pragma Assert (R in -603 .. 3328);
+
+      R := R + Boolean'Pos (R < 0) * 3329;
+      pragma Assert (R in 0 .. 3328);
+
+      return U32 (R);
    end NewMul;
 
 end ENTT;

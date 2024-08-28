@@ -90,9 +90,13 @@ is
 
 
    function OldMul (A, B : in U32) return U32
-     with Global => null;
+     with Global => null,
+          Pre => A in 0 .. 3328 and
+                 B in 0 .. 3328;
 
    function NewMul (A, B : in U32) return U32
-     with Global => null;
+     with Global => null,
+          Pre => A in 0 .. 3328 and
+                 B in 0 .. 3328;
 
 end ENTT;
