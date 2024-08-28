@@ -356,7 +356,7 @@ is
       --  Substitute R3 * Q = R4
       pragma Assert (if Left /= 0 and Right /= 0 then R1 + Q > R4);
 
-      -- R1 - R4 might be negative, so switch it signed 32-bit integers here
+      -- R1 - R4 might be negative, so switch to signed 32-bit integers here
       R := I32 (R1) - I32 (R4);
 
       pragma Assert (R > -Q and R < Q);
