@@ -1,8 +1,5 @@
 --  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 --  SPDX-License-Identifier: Apache-2.0
-
-with Ada.Text_IO; use Ada.Text_IO;
-
 with SHA3;  use SHA3;
 with SHAKE; use SHAKE;
 
@@ -1800,61 +1797,61 @@ is
       return F_Hat; --  calls _memcpy()
    end NTT;
 
-   procedure NTTinp (F_Hat : in out Poly_Zq)
-     with No_Inline
-   is
-      subtype K_T is Byte range 1 .. 128;
-      K     : K_T;
-      Len   : Len_T;
-      Count : Count_T;
+   --  procedure NTTinp (F_Hat : in out Poly_Zq)
+   --    with No_Inline
+   --  is
+   --     subtype K_T is Byte range 1 .. 128;
+   --     K     : K_T;
+   --     Len   : Len_T;
+   --     Count : Count_T;
 
-      procedure NTT_Inner (Zeta  : in     Zq.T;
-                           Start : in     Index_256)
-        with No_Inline,
-             Global => (In_Out => F_Hat,
-                        Input  => Len),
-             Pre    => Start <= 252 and
-                       Start + 2 * Len <= 256
-      is
-         T : Zq.T;
-      begin
-         for J in Index_256 range Start .. Start + (Len - 1) loop
-            T               := Zeta * F_Hat (J + Len);
-            F_Hat (J + Len) := F_Hat (J) - T;
-            F_Hat (J)       := F_Hat (J) + T;
-         end loop;
-      end NTT_Inner;
+   --     procedure NTT_Inner (Zeta  : in     Zq.T;
+   --                          Start : in     Index_256)
+   --       with No_Inline,
+   --            Global => (In_Out => F_Hat,
+   --                       Input  => Len),
+   --            Pre    => Start <= 252 and
+   --                      Start + 2 * Len <= 256
+   --     is
+   --        T : Zq.T;
+   --     begin
+   --        for J in Index_256 range Start .. Start + (Len - 1) loop
+   --           T               := Zeta * F_Hat (J + Len);
+   --           F_Hat (J + Len) := F_Hat (J) - T;
+   --           F_Hat (J)       := F_Hat (J) + T;
+   --        end loop;
+   --     end NTT_Inner;
 
-   begin
-      K     := 1;
+   --  begin
+   --     K     := 1;
 
-      for I in NTT_Len_Bit_Index loop
-         --  When I = 0, Len = 128, Count = 1
-         --       I = 1, Len =  64, Count = 2
-         --       ...
-         --       I = 6, Len =   2, Count = 64
-         Len   := 2**(7 - I);
-         Count := 2**I;
-         for J in I32 range 0 .. Count - 1 loop
-            pragma Loop_Invariant (Count * Len = 128);
-            pragma Loop_Invariant (J * 2 * Len <= 252);
-            pragma Loop_Invariant (I32 (K) = 2**I + J);
-            NTT_Inner (Zeta  => Zeta_ExpC (K),
-                       Start => J * 2 * Len);
-            K := K + 1;
-         end loop;
+   --     for I in NTT_Len_Bit_Index loop
+   --        --  When I = 0, Len = 128, Count = 1
+   --        --       I = 1, Len =  64, Count = 2
+   --        --       ...
+   --        --       I = 6, Len =   2, Count = 64
+   --        Len   := 2**(7 - I);
+   --        Count := 2**I;
+   --        for J in I32 range 0 .. Count - 1 loop
+   --           pragma Loop_Invariant (Count * Len = 128);
+   --           pragma Loop_Invariant (J * 2 * Len <= 252);
+   --           pragma Loop_Invariant (I32 (K) = 2**I + J);
+   --           NTT_Inner (Zeta  => Zeta_ExpC (K),
+   --                      Start => J * 2 * Len);
+   --           K := K + 1;
+   --        end loop;
 
-         --  When the inner loop terminates, K has been
-         --  incremented Count times, therefore...
-         pragma Assert (I32 (K) = 2**I + Count);
-         --  But we know that Count = 2**I, so...
-         pragma Assert (I32 (K) = 2 * 2**I);
-         pragma Assert (I32 (K) = 2**(I + 1));
-         pragma Loop_Invariant (2**(I + 1) <= 128);
-         pragma Loop_Invariant (I32 (K) = 2**(I + 1));
-      end loop;
-      pragma Assert (K = 128);
-   end NTTinp;
+   --        --  When the inner loop terminates, K has been
+   --        --  incremented Count times, therefore...
+   --        pragma Assert (I32 (K) = 2**I + Count);
+   --        --  But we know that Count = 2**I, so...
+   --        pragma Assert (I32 (K) = 2 * 2**I);
+   --        pragma Assert (I32 (K) = 2**(I + 1));
+   --        pragma Loop_Invariant (2**(I + 1) <= 128);
+   --        pragma Loop_Invariant (I32 (K) = 2**(I + 1));
+   --     end loop;
+   --     pragma Assert (K = 128);
+   --  end NTTinp;
 
    --  Overloaded - applies NTT to all elements of V
    function NTT (V : in Poly_Zq_Vector) return NTT_Poly_Zq_Vector
@@ -1868,15 +1865,15 @@ is
       return R;
    end NTT;
 
-   --  Overloaded - applies NTTinp to all elements of V
-   procedure NTTinp (V : in out Poly_Zq_Vector)
-     with No_Inline
-   is
-   begin
-      for I in V'Range loop
-         NTTinp (V (I));
-      end loop;
-   end NTTinp;
+   --  --  Overloaded - applies NTTinp to all elements of V
+   --  procedure NTTinp (V : in out Poly_Zq_Vector)
+   --    with No_Inline
+   --  is
+   --  begin
+   --     for I in V'Range loop
+   --        NTTinp (V (I));
+   --     end loop;
+   --  end NTTinp;
 
    --  Algorithm 10
    function NTT_Inv (F : in NTT_Poly_Zq) return Poly_Zq
@@ -2121,7 +2118,8 @@ is
 
       U := NTT_Inv (Transpose (A_Hat) * Y_Hat) + E1;
 
-      Mu := Decompress1 (ByteDecode1 (M));
+--      Mu := Decompress1 (ByteDecode1 (M));
+      Mu := ByteDecodeAndDecompress1 (M);
       V := NTT_Inv (T_Hat * Y_Hat) + E2 + Mu;
 
       C1 := ByteEncodeDU (CompressDU (U));
@@ -2207,7 +2205,7 @@ is
       --       nothing to do here.
       --    2. Modulus check - check that Decode/Encode is idempotent:
       Decoded := ByteDecode12 (Key_To_Check);
-      Reencoded := ByteEncode12 (Decoded);
+      Reencoded := ByteEncode12New (Decoded);
       return Byte_Seq_Equal (Key_To_Check, Reencoded);
    end EK_Valid_For_Encaps;
 
@@ -2388,15 +2386,5 @@ is
       pragma Unreferenced (K_Bar);
       return Result;
    end MLKEM_Decaps;
-
-   procedure Test
-   is
-      R : U8_Bit;
-   begin
-      for I in Zq.T loop
-         R := Compress1 (I);
-         Put_Line (I'Img & R'Img);
-      end loop;
-   end Test;
 
 end MLKEM;
