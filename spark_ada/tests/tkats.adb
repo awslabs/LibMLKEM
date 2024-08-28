@@ -190,7 +190,7 @@ is
       TK.Computed_PK := CK.EK;
       TK.Computed_SK := CK.DK;
 
-      if EK_Is_Valid_For_Encaps (CK.EK) then
+      if EK_Valid_For_Encaps (CK.EK) then
          MLKEM_Encaps (CK.EK, TK.Msg, TK.Computed_SS1, TK.Computed_CT);
          TK.Computed_SS2 := MLKEM_Decaps (TK.Computed_CT, CK.DK);
          TK.Computed_SS_N := MLKEM_Decaps (TK.Expected_CT_N, CK.DK);

@@ -9,10 +9,10 @@
 -----------------------------------------------------------
 
 separate (MLKEM)
---  Algorithm 12, FIPS 203 5.1
+--  Algorithm 13, FIPS 203 5.1
 function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
 is
-   D_Hash : constant Bytes_64 := G (Random_D);
+   D_Hash : constant Bytes_64 := G (Random_D & K);
    Rho    : constant Bytes_32 := D_Hash (0 .. 31);
    Sigma  : constant Bytes_32 := D_Hash (32 .. 63);
 

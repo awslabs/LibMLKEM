@@ -411,10 +411,10 @@ is
 
    ----------------------------------
    --  BitsToBytes and BytesToBits
-   --  See FIPS 203 4.2.1, 755 - 763
+   --  See FIPS 203 4.2.1
    ----------------------------------
 
-   --  Algorithm 2
+   --  Algorithm 3
    --  BitsToBytes is generic here over its parameter and return types
    --  so that each instantiation of it has definite/constrained types.
    --  This avoids the need for unconstrained parameters and return types,
@@ -435,7 +435,7 @@ is
                     Generic_BitsToBytes'Result'Length * 8 = B'Length and
                     Generic_BitsToBytes'Result'Length = B'Length / 8;
 
-   --  Algorithm 3
+   --  Algorithm 4
    --  Similarly, BytesToBits is generic to avoid unconstrained types
    generic
       type Bytes_Index is range <>;
@@ -534,7 +534,7 @@ is
 
    ----------------------------------
    --  Pseudo-Random Function
-   --  See FIPS 203 4.1, 726 - 731
+   --  See FIPS 203 4.1
    ----------------------------------
 
    function PRF_Eta_1 (S : in Bytes_32;
@@ -566,11 +566,11 @@ is
    end PRF_Eta_2;
 
    --  The function XOF is declared below
-   --  as part of Algorithm 6
+   --  as part of Algorithm 7
 
    ----------------------------------
    --  Hash functions, built on SHA3
-   --  See FIPS 203 4.1, 741 - 750
+   --  See FIPS 203 4.1
    ----------------------------------
 
    --  G returns a (32 bytes) followed by b (32 bytes)
@@ -866,7 +866,7 @@ is
    end DecompressDU;
 
    -------------------------------------------------------
-   --  Byte Encoding (Algorithm 4) and Decoding (Algorithm 5)
+   --  Byte Encoding (Algorithm 5) and Decoding (Algorithm 6)
    --  Each function is declared overloaded several times
    --  for specific values of d and parameter types.
    -------------------------------------------------------
@@ -1582,34 +1582,35 @@ is
 
 
 
-   --  Algorithm 6 - SampleNTT and XOF
+   --  Algorithm 7 - SampleNTT and XOF
    --  For this implementation, we combine XOF and SampleNTT
    --  into a single function. This avoids the need for XOF
    --  to return an unbounded sequence of bytes and/or some
    --  sort of lazy evaluation of an infinite sequence.
-   function XOF_Then_SampleNTT (Rho : in Bytes_32;
-                                I   : in Byte;
-                                J   : in Byte) return NTT_Poly_Zq
+   subtype Index_34  is I32 range 0 .. 33;
+   subtype Bytes_34  is Byte_Seq (Index_34);
+
+   function XOF_Then_SampleNTT (B : in Bytes_34) return NTT_Poly_Zq
      with No_Inline
    is
-      C  : SHAKE128.Context;
-      J2 : Natural := 0;
-      A  : NTT_Poly_Zq := (others => 0); --  calls _memset()
-      B  : Bytes_3;
+      Ctx : SHAKE128.Context;
+      J2  : Natural := 0;
+      A   : NTT_Poly_Zq := (others => 0); --  calls _memset()
+      C   : Bytes_3;
    begin
       --  Initialize and feed input data into the XOF function
       --  which is actually SHAKE128
-      SHAKE128.Init (C);
-      SHAKE128.Update (C, SHAKE128.Byte_Array (Rho & I & J));
+      SHAKE128.Init (Ctx);
+      SHAKE128.Update (Ctx, SHAKE128.Byte_Array (B));
 
       while J2 < 256 loop
          --  To execute this loop body once, we need exactly 3 bytes of output
          --  from the XOF function, so we fetch that many, and keep
          --  looping until the sampling terminates
-         SHAKE128.Extract (C, SHAKE128.Byte_Array (B));
+         SHAKE128.Extract (Ctx, SHAKE128.Byte_Array (C));
          declare
-            D1  : constant U16 := U16 (B (0)) + (256 * (U16 (B (1)) mod 16));
-            D2  : constant U16 := U16 (B (1)) / 16 + (16 * U16 (B (2)));
+            D1  : constant U16 := U16 (C (0)) + (256 * (U16 (C (1)) mod 16));
+            D2  : constant U16 := U16 (C (1)) / 16 + (16 * U16 (C (2)));
          begin
             if D1 < Q then
                A (Index_256 (J2)) := Zq.T (D1);
@@ -1625,7 +1626,7 @@ is
    end XOF_Then_SampleNTT;
 
 
-   --  Algorithm 7 - SamplePolyCBD2, specialized for Eta_1
+   --  Algorithm 8 - SamplePolyCBD2, specialized for Eta_1
    function SamplePolyCBD_Eta_1 (B : in PRF_Eta_1_Bytes) return Poly_Zq
      with No_Inline
    is
@@ -1682,7 +1683,7 @@ is
       return F;
    end SamplePolyCBD_Eta_1;
 
-   --  Algorithm 7 - SamplePolyCBD2, specialized for Eta_2
+   --  Algorithm 8 - SamplePolyCBD2, specialized for Eta_2
    function SamplePolyCBD_Eta_2 (B : in PRF_Eta_2_Bytes) return Poly_Zq
      with No_Inline
    is
@@ -1739,7 +1740,7 @@ is
    end SamplePolyCBD_Eta_2;
 
 
-   --  Algorithm 8
+   --  Algorithm 9
    function NTT (F : in Poly_Zq) return NTT_Poly_Zq
      with No_Inline
    is
@@ -1877,7 +1878,7 @@ is
       end loop;
    end NTTinp;
 
-   --  Algorithm 9
+   --  Algorithm 10
    function NTT_Inv (F : in NTT_Poly_Zq) return Poly_Zq
      with No_Inline
    is
@@ -1949,7 +1950,7 @@ is
    end NTT_Inv;
 
 
-   --  Algorithms 10 and 11
+   --  Algorithms 11 and 12
    --  BaseCaseMultiply is inlined here in MultiplyNTTs
    function MultiplyNTTs (F, G : in NTT_Poly_Zq) return NTT_Poly_Zq
      with No_Inline
@@ -1972,7 +1973,7 @@ is
       return H;
    end MultiplyNTTs;
 
-   --  FIPS 203, line 530, equation 1 defines a "dot product" operator between
+   --  FIPS 203 2.4.7 defines a "dot product" operator between
    --  matrices and vectors of Poly_Zq, so we declare it thus:
    function "*" (Left  : in NTT_Poly_Matrix;
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq_Vector
@@ -1988,7 +1989,7 @@ is
       return R; --  calls _memcpy()
    end "*";
 
-   --  Dot product of K-length vectors of NTT_Poly_Zq. FIPS 203 line 530,
+   --  Dot product of K-length vectors of NTT_Poly_Zq.
    --  third equation
    function "*" (Left  : in NTT_Poly_Zq_Vector;
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq
@@ -2037,7 +2038,7 @@ is
       --  and element of A_Hat.
       for I in K_Range loop
          for J in K_Range loop
-            A_Hat (I) (J) := XOF_Then_SampleNTT (Rho, Byte (J), Byte (I));
+            A_Hat (I) (J) := XOF_Then_SampleNTT (Rho & Byte (J) & Byte (I));
 
             --  The first I-1 slices of R are fully initialized and
             --  the first J elements of slice I are initialized
@@ -2089,19 +2090,19 @@ is
       end loop;
    end Generate_Poly_Zq_Vector_With_Eta_2;
 
-   --  Algorithm 12, FIPS 203 5.1
+   --  Algorithm 13, FIPS 203 5.1
    function K_PKE_KeyGen (Random_D : in Bytes_32) return PKE_Key
      is separate;
 
-   --  Algorithm 13, FIPS 203 5.2
+   --  Algorithm 14, FIPS 203 5.2
    function K_PKE_Encrypt (EK_PKE   : in PKE_Encryption_Key;
                            M        : in Bytes_32;
                            Random_R : in Bytes_32) return Ciphertext
    is
       A_Hat : NTT_Poly_Matrix;
 
-      R, E1, U     : Poly_Zq_Vector;
-      R_Hat, T_Hat : NTT_Poly_Zq_Vector;
+      Y, E1, U     : Poly_Zq_Vector;
+      Y_Hat, T_Hat : NTT_Poly_Zq_Vector;
 
       E2, V, Mu : Poly_Zq;
       Rho       : Bytes_32;
@@ -2112,22 +2113,16 @@ is
       Rho := EK_PKE (384 * K .. EK_PKE'Last); --  Should be exactly 32 bytes
 
       Generate_A_Hat_Matrix (Rho, A_Hat);
-      Generate_Poly_Zq_Vector_With_Eta_1 (Random_R, 0, R);
+      Generate_Poly_Zq_Vector_With_Eta_1 (Random_R, 0, Y);
       Generate_Poly_Zq_Vector_With_Eta_2 (Random_R, E1);
 
       E2 := SamplePolyCBD_Eta_2 (PRF_Eta_2 (Random_R, K * 2));
+      Y_Hat := NTT (Y);
 
---      R_Hat := NTT (R);
-      NTTinp (R);
-      R_Hat := (0 => NTT_Poly_Zq (R (0)),
-                1 => NTT_Poly_Zq (R (1)),
-                2 => NTT_Poly_Zq (R (2)));
+      U := NTT_Inv (Transpose (A_Hat) * Y_Hat) + E1;
 
-      U := NTT_Inv (Transpose (A_Hat) * R_Hat) + E1;
-
---      Mu := Decompress1 (ByteDecode1 (M));
-      Mu := ByteDecodeAndDecompress1 (M);
-      V := NTT_Inv (T_Hat * R_Hat) + E2 + Mu;
+      Mu := Decompress1 (ByteDecode1 (M));
+      V := NTT_Inv (T_Hat * Y_Hat) + E2 + Mu;
 
       C1 := ByteEncodeDU (CompressDU (U));
       C2 := ByteEncodeDV (CompressDV (V));
@@ -2135,27 +2130,28 @@ is
    end K_PKE_Encrypt;
 
 
-   --  Algorithm 14, FIPS 203 5.2
+   --  Algorithm 15, FIPS 203 5.3
    function K_PKE_Decrypt (DK_PKE   : in PKE_Decryption_Key;
                            C        : in Ciphertext) return Bytes_32
      with No_Inline
    is
-      C1    : Poly_UDU_Bytes;
-      C2    : Bytes_UDV;
-      U     : Poly_Zq_Vector;
-      S_Hat : NTT_Poly_Zq_Vector;
-      V, W  : Poly_Zq;
-      M     : Bytes_32;
+      C1     : Poly_UDU_Bytes;
+      C2     : Bytes_UDV;
+      U_Tick : Poly_Zq_Vector;
+      S_Hat  : NTT_Poly_Zq_Vector;
+      V_Tick : Poly_Zq;
+      W      : Poly_Zq;
+      M      : Bytes_32;
    begin
       C1 := C (0 .. 32 * DU * K - 1); --  calls _memcpy()
       C2 := C (32 * DU * K .. 32 * (DU * K + DV) - 1);
 
-      U := DecompressDU (ByteDecodeDU (C1));
-      V := DecompressDV (ByteDecodeDV (C2));
+      U_Tick := DecompressDU (ByteDecodeDU (C1));
+      V_Tick := DecompressDV (ByteDecodeDV (C2));
 
       S_Hat := ByteDecode12 (DK_PKE);
 
-      W := V - NTT_Inv (S_Hat * NTT (U));
+      W := V_Tick - NTT_Inv (S_Hat * NTT (U_Tick));
 
 --      M := ByteEncode1 (Compress1 (W));
       M := CompressAndEncode1 (W);
@@ -2198,6 +2194,96 @@ is
    --  Exported subprogram bodies
    --=======================================
 
+   --  FIPS 203 section 7.2
+   function EK_Valid_For_Encaps (EK_Bar : in MLKEM_Encapsulation_Key)
+     return Boolean
+   is
+      Key_To_Check : constant Poly_Zq_Vector_Bytes := EK_Bar (0 .. 384 * K - 1);
+      Decoded      : NTT_Poly_Zq_Vector;
+      Reencoded    : Poly_Zq_Vector_Bytes;
+   begin
+      --  FIPS 203 7.2 - Encapsulation key check
+      --    1. Type check. Check on the length of EK is a static type-check in SPARK, so
+      --       nothing to do here.
+      --    2. Modulus check - check that Decode/Encode is idempotent:
+      Decoded := ByteDecode12 (Key_To_Check);
+      Reencoded := ByteEncode12 (Decoded);
+      return Byte_Seq_Equal (Key_To_Check, Reencoded);
+   end EK_Valid_For_Encaps;
+
+   --  FIPS 203 section 7.3 - Decapsulation key and Ciphertext check
+   function DK_Valid_For_Decaps (DK_Bar : in MLKEM_Decapsulation_Key)
+     return Boolean
+   is
+      subtype Hash_Data_Index is I32 range 0 .. 384 * K + 31;
+      subtype Hash_Data is Byte_Seq (Hash_Data_Index);
+
+      HD : constant Hash_Data := Hash_Data (DK_Bar (384 * K .. 768 * K + 31));
+      Test, Reference_Hash : Bytes_32;
+   begin
+      --  FIPS 203 7.3 - Decapsulation key check
+      --    1. Ciphertext type check. This is a static type-check in SPARK,
+      --       so nothing to do here.
+      --    2. Decapsulation key type check. This is a static type-check in
+      --       SPARK, so nothing to do here.
+      --    3. Hash check, as follows:
+      Test           := H (HD);
+      Reference_Hash := Bytes_32 (DK_Bar (768 * K + 32 .. 768 * K + 63));
+
+      return Byte_Seq_Equal (Test, Reference_Hash);
+   end DK_Valid_For_Decaps;
+
+   --  FIPS 203 section 7.1
+   function Key_Pair_Is_Consistent_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32) return Boolean
+   is
+      Regenerated_Key : MLKEM_Key;
+   begin
+      Regenerated_Key := MLKEM_KeyGen (Random_D, Random_Z);
+      return Byte_Seq_Equal (Key_Pair.EK, Regenerated_Key.EK) and
+             Byte_Seq_Equal (Key_Pair.DK, Regenerated_Key.DK);
+   end Key_Pair_Is_Consistent_With_Seed;
+
+
+   --  FIPS 203 section 7.1 "Key pair check (without seed)"
+   function Key_Pair_Check_Without_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_M : in Bytes_32) return Boolean
+   is
+      Key          : Bytes_32;
+      Key_Tick     : Bytes_32;
+      C            : Ciphertext;
+   begin
+      --  We can only call MLKEM_Encaps and MLKEM_Decaps if
+      --  we know that DK and EK really are valid first.
+      if (DK_Valid_For_Decaps (Key_Pair.DK) and
+          EK_Valid_For_Encaps (Key_Pair.EK)) then
+
+         --  Now we can do the Pair-wise consistency check. Section 7.1 (4)
+         MLKEM_Encaps (Key_Pair.EK, Random_M, Key, C);
+         Key_Tick := MLKEM_Decaps (C, Key_Pair.DK);
+         return Byte_Seq_Equal (Key, Key_Tick);
+      else
+         return False;
+      end if;
+   end Key_Pair_Check_Without_Seed;
+
+
+   --  FIPS 203 section 7.1 "Key pair check (with seed)"
+   function Key_Pair_Check_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32;
+       Random_M : in Bytes_32) return Boolean
+   is
+   begin
+      return (Key_Pair_Is_Consistent_With_Seed (Key_Pair, Random_D, Random_Z) and
+              Key_Pair_Check_Without_Seed (Key_Pair, Random_M));
+   end Key_Pair_Check_With_Seed;
+
+   -- This is also ML-KEM.KeyGen_internal from FIPS 203 Algorithm 16
    function MLKEM_KeyGen (Random_D : in Bytes_32;
                           Random_Z : in Bytes_32) return MLKEM_Key
    is
@@ -2217,35 +2303,20 @@ is
    end MLKEM_KeyGen;
 
 
-   function EK_Is_Valid_For_Encaps (EK : in MLKEM_Encapsulation_Key)
-     return Boolean
-   is
-      Key_To_Check : constant Poly_Zq_Vector_Bytes := EK (0 .. 384 * K - 1); --  calls _memcpy()
-      Decoded      : NTT_Poly_Zq_Vector;
-      Reencoded    : Poly_Zq_Vector_Bytes;
-   begin
-      --  FIPS 203 6.2 line 980 - 997
-      --    1. Check on the length of EK is a static type-check in SPARK, so
-      --       nothing to do here.
-      --    2. Modulus check - check that Decode/Encode is idempotent:
-      Decoded := ByteDecode12 (Key_To_Check);
-      Reencoded := ByteEncode12New (Decoded);
-      return Byte_Seq_Equal (Key_To_Check, Reencoded);
-   end EK_Is_Valid_For_Encaps;
-
-
+   -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 17
    procedure MLKEM_Encaps (EK       : in     MLKEM_Encapsulation_Key;
                            Random_M : in     Bytes_32;
-                           SS       :    out Bytes_32;
+                           Key      :    out Bytes_32;
                            C        :    out Ciphertext)
    is
       KR : Bytes_64;
    begin
-      KR := G (Random_M & H (EK));
-      SS := KR (0 .. 31);
-      C  := K_PKE_Encrypt (EK, Random_M, Bytes_32 (KR (32 .. 63))); --  calls _memcpy()
+      KR  := G (Random_M & H (EK));
+      Key := KR (0 .. 31);
+      C   := K_PKE_Encrypt (EK, Random_M, Bytes_32 (KR (32 .. 63))); --  calls _memcpy()
    end MLKEM_Encaps;
 
+   -- This is also ML-KEM.Encaps_internal from FIPS 203 Algorithm 18
    function MLKEM_Decaps (C  : in Ciphertext;
                           DK : in MLKEM_Decapsulation_Key) return Bytes_32
    is

@@ -1,0 +1,8 @@
+Good key check       - PASS
+Corrupt EK check     - PASS
+Corrupt DK check     - PASS
+Corrupt D Seed check - PASS
+Valid EK check       - PASS
+Corrupt EK check     - PASS
+Valid DK check       - PASS
+Corrupt DK check     - PASS

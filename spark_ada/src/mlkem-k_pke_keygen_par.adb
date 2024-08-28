@@ -51,7 +51,7 @@ is
 
 begin
 
-   D_Hash := G (Random_D);
+   D_Hash := G (Random_D & K);
    Sigma  := D_Hash (32 .. 63);
 
    declare

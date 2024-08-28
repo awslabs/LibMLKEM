@@ -13,7 +13,7 @@ is
    --==============================================
 
    --  Constants common to all parameter sets
-   --  from FIPS 203 section 7
+   --  from FIPS 203 section 8
    Q      : constant := 3329;
    N      : constant := 256;
 
@@ -21,21 +21,21 @@ is
    --  TODO - make the entire package generic over these parameter values
    ----------------------------------------------------------------------
 
-   --  Parameters for ML-KEM-512 from FIPS 203 section 7
+   --  Parameters for ML-KEM-512 from FIPS 203 section 8
    --  K      : constant := 2;
    --  Eta_1  : constant := 3;
    --  Eta_2  : constant := 2;
    --  DU     : constant := 10;
    --  DV     : constant := 4;
 
-   --  Parameters for ML-KEM-768 from FIPS 203 section 7
+   --  Parameters for ML-KEM-768 from FIPS 203 section 8
    K      : constant := 3;
    Eta_1  : constant := 2;
    Eta_2  : constant := 2;
    DU     : constant := 10;
    DV     : constant := 4;
 
-   --  Parameters for ML-KEM-1024 from FIPS 203 section 7
+   --  Parameters for ML-KEM-1024 from FIPS 203 section 8
    --  K      : constant := 4;
    --  Eta_1  : constant := 2;
    --  Eta_2  : constant := 2;
@@ -46,7 +46,7 @@ is
    --  Parameter set validation
    ----------------------------------------------------------------------
 
-   --  FIPS 203 section 6 requires that implementations shall confirm
+   --  FIPS 203 section 8 requires that implementations shall confirm
    --  that only valid sets of parameters are chosen.  This can be
    --  encoded as an assertion, thus:
    pragma Assert
@@ -85,39 +85,63 @@ is
    end record;
 
    --==============================================
-   --  Exported subprograms. These 4 subprograms
+   --  Exported subprograms. These subprograms
    --  form the main user-facing API for MLKEM
    --==============================================
 
-   --  Input data validation for Algorithm 16. FIPS 203 line 984
-   function EK_Is_Valid_For_Encaps (EK : in MLKEM_Encapsulation_Key)
+   --  Input Validation Functions
+
+   --  FIPS 203 section 7.2 - Encapsulation key check
+   function EK_Valid_For_Encaps (EK_Bar : in MLKEM_Encapsulation_Key)
+      return Boolean
+     with Global => null;
+
+   --  FIPS 203 section 7.3 - Decapsulation key check
+   --  NOTE: The "Ciphertext type check" specified in 7.1 (1) is a wholly
+   --  static type-check in SPARK, so does not require a dynamic check here.
+   function DK_Valid_For_Decaps (DK_Bar : in MLKEM_Decapsulation_Key)
      return Boolean
      with Global => null;
 
-   --  Algorithm 15
+   --  FIPS 203 section 7.1 "Key pair check (without seed)"
+   function Key_Pair_Check_Without_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_M : in Bytes_32) return Boolean
+     with Global => null;
+
+   --  FIPS 203 section 7.1 "Key pair check (with seed)"
+   function Key_Pair_Check_With_Seed
+      (Key_Pair : in MLKEM_Key;
+       Random_D : in Bytes_32;
+       Random_Z : in Bytes_32;
+       Random_M : in Bytes_32) return Boolean
+     with Global => null;
+
+   --  Main MLKEM API
+
+   --  Algorithm 19
    function MLKEM_KeyGen (Random_D : in Bytes_32;
                           Random_Z : in Bytes_32) return MLKEM_Key
      with Global => null;
 
-   --  Algorithm 16
+   --  Algorithm 20
    procedure MLKEM_Encaps (EK       : in     MLKEM_Encapsulation_Key;
                            Random_M : in     Bytes_32;
-                           SS       :    out Bytes_32;
+                           Key      :    out Bytes_32;
                            C        :    out Ciphertext)
      with Global => null,
-                     --  Precondition from FIPS 203 lines 980 - 985
+                     --  Precondition from FIPS 203
           Pre    => EK'Length = 384 * K + 32 and
-                    EK_Is_Valid_For_Encaps (EK);
+                    EK_Valid_For_Encaps (EK);
 
-   --  Algorithm 17
+   --  Algorithm 21
    function MLKEM_Decaps (C  : in Ciphertext;
                           DK : in MLKEM_Decapsulation_Key) return Bytes_32
      with Global => null,
-                     --  Precondition from FIPS 203 lines 1009 - 1014
+                     --  Precondition from FIPS 203
           Pre    => C'Length = 32 * (DU * K + DV) and
-                    DK'Length = 768 * K + 96;
-
-   procedure Test;
+                    DK'Length = 768 * K + 96 and
+                    DK_Valid_For_Decaps (DK);
 
 private
    subtype U16 is Unsigned_16;
@@ -125,7 +149,6 @@ private
    subtype U64 is Unsigned_64;
    subtype I64 is Integer_64;
 
-   --  FIPS 203, 2.3, line 414
    subtype SU7 is Byte range 0 .. 127;
 
    subtype Index_128 is I32 range 0 .. 127;
