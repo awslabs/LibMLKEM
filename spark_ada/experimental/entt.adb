@@ -710,30 +710,37 @@ is
    function OldMul (A, B : in U32) return U32
    is
    begin
-      return (A * B) mod 3329;
+      return (A * B) mod Q;
    end OldMul;
 
-   --  THIS WORKS! 26/8/2024
+   --  THIS WORKS! 29/8/2024 with full correctness proof
    function NewMul (A, B : in U32) return U32
    is
-      M : constant U32 := A * B;
+      P     : constant := 20;
+      C     : constant := 2**P;
+      Magic : constant := (C / Q + 1); -- 315
+
+      M  : constant U32 := A * B;
       M2 : U32;
-      R : I32;
+      R  : I32;
    begin
-      pragma Assert (M in 0 .. 11_075_584);
-      M2 := U32 (M) * 315;
-      pragma Assert (M2 in 0 .. 3_488_808_960);
-      M2 := Shift_Right (M2, 20);
-      pragma Assert (M2 in 0 .. 3327);
-      M2 := M2 * 3329;
-      pragma Assert (M2 in 0 .. 11_078_583);
+      M2 := Shift_Right (M * Magic, P) * Q;
 
+      pragma Assert ((M2 = (M / Q) * Q) or
+                     (M2 = ((M / Q) * Q) + Q));
+
+      --  In the second case, M2 is "too big" by Q, so subtracting
+      --  it from M might be negative, so we switch to signed arithmetic here.
       R := I32 (M) - I32 (M2);
-      pragma Assert (R in -603 .. 3328);
 
-      R := R + Boolean'Pos (R < 0) * 3329;
-      pragma Assert (R in 0 .. 3328);
+      pragma Assert ((R = I32 (M) - I32 ((M / Q) * Q)) or
+                     (R = I32 (M) - I32 (((M / Q) * Q) + Q)));
 
+      --  In the second case above, R is negative, so we conditionally
+      --  add Q to get the right answer...
+      R := R + Boolean'Pos (R < 0) * Q;
+
+      pragma Assert (U32 (R) = M mod Q);
       return U32 (R);
    end NewMul;
 

@@ -97,6 +97,7 @@ is
    function NewMul (A, B : in U32) return U32
      with Global => null,
           Pre => A in 0 .. 3328 and
-                 B in 0 .. 3328;
+                 B in 0 .. 3328,
+          Post => NewMul'Result = (A * B) mod Q;
 
 end ENTT;
