@@ -724,7 +724,14 @@ is
       M2 : U32;
       R  : I32;
    begin
-      M2 := Shift_Right (M * Magic, P) * Q;
+      M2 := Shift_Right (M * Magic, P);
+
+      --  Owing to the error-bound on Magic, M2 is either
+      --  "just right" or "too big by 1"
+      pragma Assert ((M2 = M / Q) or
+                     (M2 = (M / Q) + 1));
+
+      M2 := M2 * Q;
 
       pragma Assert ((M2 = (M / Q) * Q) or
                      (M2 = ((M / Q) * Q) + Q));
