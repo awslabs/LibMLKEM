@@ -14,7 +14,9 @@ is
 
    subtype Byte is Unsigned_8;
    subtype U32  is Unsigned_32;
+   subtype U64  is Unsigned_64;
    subtype I32  is Integer_32;
+   subtype I64  is Integer_64;
    subtype N32  is I32 range 0 .. I32'Last;
 
    type Zq is mod Q;
@@ -99,5 +101,9 @@ is
           Pre => A in 0 .. 3328 and
                  B in 0 .. 3328,
           Post => NewMul'Result = (A * B) mod Q;
+
+   function Mul2 (Left, Right : in Zq) return Zq
+     with Global => null,
+          Post => Mul2'Result = Zq ((U32 (Left) * U32 (Right)) mod Q);
 
 end ENTT;

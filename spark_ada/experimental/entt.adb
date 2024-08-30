@@ -751,4 +751,42 @@ is
       return U32 (R);
    end NewMul;
 
+   C      : constant := 2**37;
+   Magic  : constant := C / Q;
+
+   function Mul2 (Left, Right : in Zq) return Zq
+   is
+      R2         : I64;
+      R, R1, R3  : I32;
+   begin
+      --  We know that Left and Right and both < Q, so 16x16->32-bit multiplication
+      --  is sufficient
+      R1 := I32 (Left) * I32 (Right);
+
+      --  Switch to 64-bit multiplication now
+      R2 := I64 (R1) * Magic;
+
+      --  Shift right by 37 places, and switch back to 32-bit from here on
+      R3 := I32 (R2 / C);
+
+      --  Lemma 1 - Given that Q is prime and R1 is the product of two numbers, both < Q,
+      --            the it's impossible for (R1 / Q) * Q = R1
+      --
+      --  This Lemma is proved in Lean4 and HOL-Light in the file zq_multiply_proof.txt,
+      --  so it is "Assumed" here.
+      pragma Assume ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) /= R1)));
+
+      --  We know that Magic is rounded down, but Lemma 1 is strong enough to exclude
+      --  the case where R3 = (R1 / Q) - 1, so we can infer...
+      pragma Assert (R3 = R1 / Q);
+
+      R := R1 - R3 * Q;
+
+      --  From the definition of "mod", we can conclude
+      --    R = R1 - (R1 / Q) * Q) = R1 mod Q
+      --  so we have the right answer
+      pragma Assert (Zq (R) = Zq (R1 mod Q));
+      return Zq (R);
+   end Mul2;
+
 end ENTT;
