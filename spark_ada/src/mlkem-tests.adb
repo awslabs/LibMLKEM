@@ -25,7 +25,7 @@ is
       end loop;
 
       --  Exhaustive test of ModQ for all U16
-      for K in U16 loop
+      for K in U16_12Bits loop
          R1 := ModQ (K);
          R3 := K mod Q;
          Put (K'Img & " mod Q =");

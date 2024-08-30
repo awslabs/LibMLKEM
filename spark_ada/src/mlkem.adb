@@ -154,57 +154,12 @@ is
          return T (R);
       end "*";
 
-      function ModQ (X : in U16) return T
+      function ModQ (X : in U16_12Bits) return T
       is
-         R, R1, R2, R3, R4 : U64;
       begin
-         R1 := U64 (X);
-
-         --  We need to prove a lower bound on (R1 / Q) * Q
-         pragma Assert (((R1 / Q) * Q) + Q >= R1);
-
-         --  Rearrange...
-         pragma Assert (R1 <= Q + ((R1 / Q) * Q));
-
-         --  Multiply top and bottom of the division by C...
-         pragma Assert (R1 <= Q + (((R1 * C) / (Q * C)) * Q));
-
-         --  Rearrange...
-         pragma Assert (R1 <= Q + (((R1 * (C / Q)) / C) * Q));
-
-         R2 := R1 * Magic;
-
-         --  Substitute R1 * (C / Q) = R1 * Magic = R2
-         pragma Assert (R1 <= Q + ((R2 / C) * Q));
-
-         R3 := R2 / C; --  shift right by 37 bits
-
-         --  Substitute R2 / C = R3
-         pragma Assert (R1 <= Q + (R3 * Q));
-
-         R4 := R3 * Q;
-
-         --  Substitute R3 * Q = R4
-         pragma Assert (R1 <= Q + R4);
-
-         --  and therefore R1 - R4 <= Q
-         pragma Assert (R1 - R4 <= Q);
-
-         --  so can be safely converted to type T
-         R := R1 - R4;
-
-         pragma Assert (R <= Q);
-
-         -- R is in 0 .. 3329 here, so we still need to reduce the case where
-         -- R = 3329 -> 0 in constant time, so
-         R := Boolean'Pos (R /= Q) * R;
-
-         pragma Assert (R < Q);
-
-         --  so can be safely converted to type T,
-         --  and the answer is correct
-         pragma Assert (T (R) = T (X mod Q));
-         return T (R);
+         --  X is in range 0 .. 4095, so a constant-time
+         --  conditional subtract of Q suffices.
+         return T (X - (Q * Boolean'Pos (X >= Q)));
       end ModQ;
 
       function Div2 (Right : in T) return T
@@ -1031,7 +986,7 @@ is
 
       Bits : constant Bits_3072 := BytesToBits (B);
       F : NTT_Poly_Zq;
-      T : U16;
+      T : U16_12Bits;
    begin
       for I in F'Range loop
          T := U16 (Bits (I * 12)) +

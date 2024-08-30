@@ -192,7 +192,8 @@ private
               Global => null;
 
       --  Returns X mod Q, but implemented in constant time.
-      function ModQ (X : in U16) return T
+      subtype U16_12Bits is U16 range 0 .. 4095;
+      function ModQ (X : in U16_12Bits) return T
          with No_Inline,
               Global => null,
               Post   => ModQ'Result = T (X mod Q);
