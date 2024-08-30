@@ -119,101 +119,37 @@ is
 
       function "*" (Left, Right : in T) return T
       is
-         subtype Zq_Product is I32 range 0 .. ((Q - 1) ** 2);
-
-         R1     : Zq_Product;
-         R2     : I64;
-
-         TA, TB, R, R3, R4 : I32;
+         R2         : I64;
+         R, R1, R3  : I32;
       begin
-         --  This implementation computes (Left * Right) mod Q
-         --  using the Barrett/Montgomery reduction trick (See PLDI '94 for
-         --  the gory details.)  Most compilers will do this automatically,
-         --  but gcc -Os generates "divide" instructions which have variable
-         --  time, so this is written out explicity here.
-         --
-         --  Essentially, to compute A mod Q, we want to do
-         --    A mod Q = A - (A / Q) * Q, where "/" truncates towards zero
-         --  To avoid the division operator, we can multiply by the reciprocal:
-         --            = A - (A * (1 / Q)) * Q
-         --  and then multiply both top and bottom of the division by a suitably
-         --  large power of 2.  It turns about that 2**37 / Q = 41_285_357.1
-         --  which is close enough that the integer value Magic = 41_285_357 can be used
-         --  if Left and Right are both less than Q.
-         --            = A - ((A * Magic) / 2**37) * Q
-         --  We choose a power of 2, so that the division is now implemented by a shift-right.
+         --  We know that Left and Right and both < Q, so 16x16->32-bit multiplication
+         --  is sufficient
+         R1 := I32 (Left) * I32 (Right);
 
-         --  Initial multiplication of Left * Right can be done using 32-bit maths
-         --  with no chance of overflow, so...
-         TA := I32 (Left);
-         TB := I32 (Right);
-         R1 := TA * TB;
-
-         pragma Assert (((R1 / Q) * Q) <= R1); --  L1
-
-         --  Here, it ought to be possible to prove that
-         --    (((R1 / Q) * Q) /= R1) if A /= 0 and B /= 0
-         --  since Q is prime.  If (((Left * Right) / Q) * Q) = R1, then
-         --  either Left = Q or Right = Q, but that can't be possible
-         --  since we know that both Left and Right are < Q.
-         --
-         --  The SMT solvers can't get that, since they have no built-in
-         --  understanding of the primes, but TWO proofs of this propertyy
-         --  have been established.
-         --    1. In Lean4, courtesy of Leo DeMoura and Kevin Buzzard.
-         --    2. In HOL-Lite, thanks to John Harrison
-         --  See the file zq_multiply_proof.txt
-         --
-         --  For SPARK, we "Assume" rather than "Assert" this property...
-         pragma Assume ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) /= R1))); -- L2
-
-         --  L1 and L2 combine to conclude
-         pragma Assert ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) < R1)));
-
-         --  We need to prove a lower bound on (R1 / Q) * Q
-         pragma Assert ((if Left = 0 or Right = 0 then R1 = 0));
-         pragma Assert ((if Left /= 0 and Right /= 0 then ((R1 / Q) * Q) + Q > R1));
-
-         --  Rearrange...
-         pragma Assert ((if Left /= 0 and Right /= 0 then R1 < ((R1 / Q) * Q) + Q));
-
-         --  Multiply top and bottom of the division by C...
-         pragma Assert (if Left /= 0 and Right /= 0 then R1 < I32 (Q + (((I64 (R1) * C) / (Q * C)) * Q)));
-
-         --  Rearrange..
-         pragma Assert (if Left /= 0 and Right /= 0 then R1 < I32 (Q + (((I64 (R1) * (C / Q)) / C) * Q)));
-
-         --  R1 is less than 2**24, and Magic is a bit less than 2**25, so we need to
-         --  switch to 64-bit arithmetic now.
+         --  Switch to 64-bit multiplication now
          R2 := I64 (R1) * Magic;
 
-         --  Substitute R1 * (C / Q) = R1 * Magic = R2
-         pragma Assert (if Left /= 0 and Right /= 0 then R1 < I32 (Q + ((R2 / C) * Q)));
-
-         --  Shift right by 37 bits, then switch back to 32 bit arithmetic from here on
+         --  Shift right by 37 places, and switch back to 32-bit from here on
          R3 := I32 (R2 / C);
 
-         --  Substitute R2 / C = R3
-         pragma Assert (if Left /= 0 and Right /= 0 then R1 < I32 (Q + (R3 * Q)));
+         --  Lemma 1 - Given that Q is prime and R1 is the product of two numbers, both < Q,
+         --            the it's impossible for (R1 / Q) * Q = R1
+         --
+         --  This Lemma is proved in Lean4 and HOL-Light in the file zq_multiply_proof.txt,
+         --  so it is "Assumed" here.
+         pragma Assume ((if Left /= 0 and Right /= 0 then (((R1 / Q) * Q) /= R1)));
 
-         R4 := R3 * Q;
+         --  We know that Magic is rounded down, but Lemma 1 is strong enough to exclude
+         --  the case where R3 = (R1 / Q) - 1, so we can infer...
+         pragma Assert (R3 = R1 / Q);
 
-         --  Substitute R3 * Q = R4
-         pragma Assert (if Left = 0 or Right = 0 then R1 = 0 and R4 = 0);
-         pragma Assert (if Left /= 0 and Right /= 0 then R1 < I32 (Q + R4));
+         R := R1 - R3 * Q;
 
-         --  and therefore R1 - R4 < Q
-         R := R1 - R4;
-         pragma Assert (if Left = 0 or Right = 0 then R = 0);
-         pragma Assert (if Left /= 0 and Right /= 0 then R < Q);
-         -- Finally, we can combine the two cases to conclude
-         pragma Assert (R < Q);
-
-         --  so can be safely converted to type T,
-         --  and the answer is correct
-         pragma Assert (if Left = 0 or Right = 0 then R = 0);
-         pragma Assert (if Left /= 0 and Right /= 0 then T (R) = T (R1 mod Q));
+         --  From the definition of "mod", we can conclude
+         --    R = R1 - (R1 / Q) * Q) = R1 mod Q
+         --  so we have the right answer
          pragma Assert (T (R) = T (R1 mod Q));
+
          return T (R);
       end "*";
 
