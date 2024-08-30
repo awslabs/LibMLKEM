@@ -32,6 +32,7 @@ is
    Red_Count : Natural := 0;
 
    function RCount return Natural
+     with SPARK_Mode => Off
    is
    begin
       return Red_Count;
@@ -71,8 +72,25 @@ is
        with No_Inline,
             Global => null,
             Pre    => Start <= 252 and
-                      Start + 2 * Len <= 256;
-
+                      Start + 2 * Len <= 256 and
+                      (for all K in Index_256 => F_Hat (K) in Mont_Range), --  TOO STRONG!
+            Post   =>
+                      -- Elements 0 .. Start - 1 are unchanged
+                      (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Old (I))
+                     and
+                      (
+                       -- Elements Start through Start + 2 * Len - 1 are updated
+                      (for all I in Index_256 range Start .. Start + (Len - 1) =>
+                       ((F_Hat (I)       >= F_Hat'Old (I) - Q) and
+                        (F_Hat (I)       <= F_Hat'Old (I) + Q) and
+                        (F_Hat (I + Len) >= F_Hat'Old (I) - Q) and
+                        (F_Hat (I + Len) <= F_Hat'Old (I) + Q)
+                       )
+                       )
+                      )
+                    and
+                      --  Elements from Start + 2 * Len .. 255 are unchanged
+                      (for all I in Index_256 range Start + 2 * Len  .. 255 => F_Hat (I) = F_Hat'Old (I));
 
    procedure NTT_Inner (F_Hat : in out Poly_Zq;
                         Zeta  : in     Zeta_Range;
@@ -85,7 +103,36 @@ is
          T := FQMul (Zeta, F_Hat (J + Len));
          F_Hat (J + Len) := F_Hat (J) - T;
          F_Hat (J)       := F_Hat (J) + T;
+
+         pragma Loop_Invariant
+            -- Elements 0 .. Start - 1 are unchanged
+           (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+         pragma Loop_Invariant
+           (
+            -- Elements Start through J are updated
+            (for all I in Index_256 range Start .. J =>
+             ((F_Hat (I) >= F_Hat'Loop_Entry (I) - Q) and
+              (F_Hat (I) <= F_Hat'Loop_Entry (I) + Q)
+             )
+            )
+           );
+         pragma Loop_Invariant
+            -- Elements J + 1 .. Start + Len - 1 are unchanged
+            (for all I in Index_256 range J + 1 .. Start + Len - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+         pragma Loop_Invariant
+            --  Elements Start + Len through J + Len are updated
+            (for all I in Index_256 range Start .. J =>
+             ((F_Hat (I + Len) >= F_Hat'Loop_Entry (I) - Q) and
+              (F_Hat (I + Len) <= F_Hat'Loop_Entry (I) + Q))
+            );
+         pragma Loop_Invariant
+            --  Elements from J + Len + 1 .. 255 are unchanged
+            (for all I in Index_256 range J + Len + 1 .. 255 => F_Hat (I) = F_Hat'Loop_Entry (I));
+
       end loop;
+
+
+
    end NTT_Inner;
 
 
