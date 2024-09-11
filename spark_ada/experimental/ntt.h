@@ -23,4 +23,10 @@ void invntt(int16_t poly[256]);
 #define basemul KYBER_NAMESPACE(basemul)
 void basemul(int16_t r[2], const int16_t a[2], const int16_t b[2], int16_t zeta);
 
+typedef struct{
+  int16_t coeffs[KYBER_N];
+} poly;
+
+void poly_ntt(int16_t f[256]);
+
 #endif

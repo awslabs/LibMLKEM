@@ -104,6 +104,28 @@ void ntt(int16_t r[256]) {
   }
 }
 
+int16_t barrett_reduce(int16_t a) {
+  int16_t t;
+  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
+
+  t  = ((int32_t)v*a + (1<<25)) >> 26;
+  t *= KYBER_Q;
+  return a - t;
+}
+
+void poly_reduce(int16_t f[256])
+{
+  unsigned int i;
+  for(i=0;i<KYBER_N;i++)
+    f[i] = barrett_reduce(f[i]);
+}
+
+void poly_ntt(int16_t f[256])
+{
+  ntt(f);
+  poly_reduce(f);
+}
+
 // Calls to fqmul
 // = 1 * 128
 // + 2 * 64
