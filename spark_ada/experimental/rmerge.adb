@@ -152,8 +152,7 @@ is
    end FQMul;
 
    procedure NTT_Inner12 (F : in out Poly_Zq)
-       with No_Inline,
-            Global => null,
+       with Global => null,
             Pre  => (for all K in Index_256 => F (K) in Mont_Range),
             Post => (for all K in Index_256 => F (K) in Mont_Range3);
 
@@ -219,8 +218,7 @@ is
    procedure NTT_Inner34_Slice (F     : in out Poly_Zq;
                                 ZI    : in     SU7;
                                 Start : in     Index_256)
-       with No_Inline,
-            Global => null,
+       with             Global => null,
             Pre  => ZI in 4 .. 7 and then
                     Start <= 192 and then
                     (for all I in Index_256 range Start      .. Start + 63 => (F (I) in Mont_Range3)),
@@ -294,10 +292,9 @@ is
 
 
    procedure NTT_Inner34 (F : in out Poly_Zq)
-       with No_Inline,
-            Global => null,
-            Pre  => (for all K in Index_256 => F (K) in Mont_Range3),
-            Post => (for all K in Index_256 => F (K) in Mont_Range5);
+     with Global => null,
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range3),
+          Post => (for all K in Index_256 => F (K) in Mont_Range5);
 
    procedure NTT_Inner34 (F : in out Poly_Zq)
    is
@@ -311,8 +308,7 @@ is
    procedure NTT_Inner56_Slice (F     : in out Poly_Zq;
                                 ZI    : in     SU7;
                                 Start : in     Index_256)
-       with No_Inline,
-            Global => null,
+       with Global => null,
             Pre  => ZI in 16 .. 31 and then
                     Start <= 240 and then
                     (for all I in Index_256 range Start      .. Start + 15 => (F (I) in Mont_Range5)),
@@ -389,8 +385,7 @@ is
 
 
    procedure NTT_Inner56 (F : in out Poly_Zq)
-       with No_Inline,
-            Global => null,
+       with Global => null,
             Pre  => (for all K in Index_256 => F (K) in Mont_Range5),
             Post => (for all K in Index_256 => F (K) in Mont_Range7);
 
@@ -419,8 +414,7 @@ is
    procedure NTT_Inner7_Slice (F     : in out Poly_Zq;
                                ZI    : in     SU7;
                                Start : in     Index_256)
-       with No_Inline,
-            Global => null,
+       with Global => null,
             Pre  => ZI in 64 .. 127 and then
                     Start <= 252 and then
                     (for all I in Index_256 range Start      .. Start + 3 => (F (I) in Mont_Range7)),
@@ -432,12 +426,18 @@ is
                                ZI    : in     SU7;
                                Start : in     Index_256)
    is
-      T : Mont_Range;
+      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
    begin
       for J in Index_256 range Start .. Start + 1 loop
-         T := FQMul (Zeta_ExpC (ZI), F (J + 2));
-         F (J + 2) := F (J) - T;
-         F (J)     := F (J) + T;
+         declare
+            J2  : constant Index_256 := J + 2;
+            FJ2 : constant I16 := F (J2);
+            T   : constant Mont_Range := FQMul (Zeta, FJ2);
+            FJ  : constant I16 := F (J);
+         begin
+            F (J + 2) := FJ - T;
+            F (J)     := FJ + T;
+         end;
 
          pragma Loop_Invariant
            -- Elements 0 .. Start - 1 are unchanged
@@ -460,8 +460,7 @@ is
 
 
    procedure NTT_Inner7 (F : in out Poly_Zq)
-       with No_Inline,
-            Global => null,
+       with Global => null,
             Pre  => (for all K in Index_256 => F (K) in Mont_Range7),
             Post => (for all K in Index_256 => F (K) in Mont_Range8);
 
