@@ -1,0 +1,35 @@
+project TRef
+is
+   for Source_Dirs use (".");
+
+   for Main use ("tref.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-gnat2022",
+         "-gnatwaJ",
+         "-gnaty-s",
+--         "-gnatp",
+         "-gnata",
+         "-O3",
+         "-g",
+         "-ffunction-sections", -- Create a linker section for each function
+         "-fdata-sections");    -- Create a linker section for each data
+   end Compiler;
+
+
+   package Prove is
+      for Proof_Switches ("Ada") use ("--proof=per_path",
+                                      "-j8",
+                                      "--no-global-generation",
+                                      "--no-inlining",
+                                      "--no-loop-unrolling",
+                                      "--level=1",
+                                      "--prover=z3,cvc4,altergo",
+                                      "--timeout=5",
+                                      "--memlimit=0",
+                                      "--steps=50000",
+                                      "--report=statistics");
+   end Prove;
+
+end TRef;
