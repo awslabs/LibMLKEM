@@ -67,12 +67,14 @@ is
           No_Inline,
           Pre  => (for all K in Index_256 => F (K) in Mont_Range);
 
-   --  Standard CT-based NTT implemented as per FIPS 203, C versio
+   --  Standard CT-based NTT implemented as per FIPS 203, C version
    procedure CNTT (F : in out Poly_Zq)
      with Global => null,
           Import,
           Convention => C,
-          External_Name => "pqcrystals_kyber768_ref_ntt",
+          External_Name => "poly_ntt",
           No_Inline;
+
+   procedure PP (F : in Poly_Zq);
 
 end ENTTRef;

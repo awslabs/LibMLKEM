@@ -31,12 +31,46 @@ is
 
    Red_Count : Natural := 0;
 
+   procedure PP (F : in Poly_Zq)
+   is
+   begin
+      for I in F'Range loop
+         Put (F (I)'Img);
+      end loop;
+      New_Line (2);
+   end PP;
+
+
    function RCount return Natural
      with SPARK_Mode => Off
    is
    begin
       return Red_Count;
    end RCount;
+
+   --  Given
+   --     int32_t a;
+   --  mimics
+   --    int16_t r = (int16_t) a;
+   --
+   --  which is implementation-defined in C, but most compilers
+   --  implement this by jsut dropping the most significant 16
+   --  bits, and re-interpreting bit 15 as the sign bit of the answer.
+   function To16 (A : in Integer_32) return Integer_16
+   is
+      subtype Bit is Integer_32 range 0 .. 1;
+      Flip_Factor : Bit;
+      T : Integer_32;
+   begin
+      T := A mod 65536;
+      Flip_Factor := Boolean'Pos (T >= 32768);
+
+      --  If T is in     0 .. 32767, then leave it alone.
+      --  If T is in 32768 .. 65535, then subtract 65536
+      T := T - (Flip_Factor * 65536);
+      return Integer_16 (T);
+   end To16;
+
 
    function Montgomery_Reduce (X : in Mont_Domain) return Mont_Range
      with SPARK_Mode => Off
@@ -54,6 +88,36 @@ is
       return Mont_Range (T5);
    end Montgomery_Reduce;
 
+   subtype BRange is Integer_16 range -1664 .. 1664;
+
+   -- Barrett reduction
+   function BR (A : in Integer_16) return BRange
+   is
+      --  int16_t t;
+      --  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
+      --
+      --  t  = ((int32_t)v*a + (1<<25)) >> 26;
+      --  t *= KYBER_Q;
+      --  return a - t;
+
+       C25 : constant := 2**25;
+       C26 : constant := 2**26;
+       V   : constant := (C26 + (Q / 2)) / Q;
+       T   : Integer_32;
+       T2  : Integer_16;
+       R   : BRange;
+   begin
+       pragma Assert (V = 20159);
+       --  t  = ((int32_t)v * a + (1 << 25)) >> 26;
+       T2 := To16 (Shift_Right_Arithmetic (V * Integer_32 (A) + C25, 26));
+       T2 := T2 * Q;
+--       T2 := To16 (T);
+       T := Integer_32 (A) - Integer_32 (T2);
+       T2 := To16 (T);
+       R := BRange (T2);
+       return R;
+   end BR;
+
    function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta
                    B : in I16) return Mont_Range
    is
@@ -66,14 +130,14 @@ is
    end FQMul;
 
    procedure NTT_Inner (F_Hat : in out Poly_Zq;
-                        Zeta  : in     Zeta_Range;
+                        ZI    : in     SU7;
                         Start : in     Index_256;
                         Len   : in     Index_256)
        with No_Inline,
             Global => null,
             Pre    => Start <= 252 and
                       Start + 2 * Len <= 256 and
-                      (for all K in Index_256 => F_Hat (K) in Mont_Range), --  TOO STRONG!
+                      (for all K in Index_256 => F_Hat (K) in Mont_Range7),
             Post   =>
                       -- Elements 0 .. Start - 1 are unchanged
                       (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Old (I))
@@ -93,56 +157,77 @@ is
                       (for all I in Index_256 range Start + 2 * Len  .. 255 => F_Hat (I) = F_Hat'Old (I));
 
    procedure NTT_Inner (F_Hat : in out Poly_Zq;
-                        Zeta  : in     Zeta_Range;
+                        ZI    : in     SU7;
                         Start : in     Index_256;
                         Len   : in     Index_256)
    is
       T : Mont_Range;
    begin
       for J in Index_256 range Start .. Start + (Len - 1) loop
-         T := FQMul (Zeta, F_Hat (J + Len));
-         F_Hat (J + Len) := F_Hat (J) - T;
-         F_Hat (J)       := F_Hat (J) + T;
-
          pragma Loop_Invariant
             -- Elements 0 .. Start - 1 are unchanged
            (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
          pragma Loop_Invariant
            (
-            -- Elements Start through J are updated
-            (for all I in Index_256 range Start .. J =>
+            -- Elements Start through J - 1 are updated
+            (for all I in Index_256 range Start .. J - 1 =>
              ((F_Hat (I) >= F_Hat'Loop_Entry (I) - Q) and
               (F_Hat (I) <= F_Hat'Loop_Entry (I) + Q)
              )
             )
            );
          pragma Loop_Invariant
-            -- Elements J + 1 .. Start + Len - 1 are unchanged
-            (for all I in Index_256 range J + 1 .. Start + Len - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+            -- Elements J .. Start + Len - 1 are unchanged
+            (for all I in Index_256 range J .. Start + Len - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
          pragma Loop_Invariant
-            --  Elements Start + Len through J + Len are updated
-            (for all I in Index_256 range Start .. J =>
+            --  Elements Start + Len through J + Len - 1 are updated
+            (for all I in Index_256 range Start .. J - 1 =>
              ((F_Hat (I + Len) >= F_Hat'Loop_Entry (I) - Q) and
               (F_Hat (I + Len) <= F_Hat'Loop_Entry (I) + Q))
             );
          pragma Loop_Invariant
-            --  Elements from J + Len + 1 .. 255 are unchanged
-            (for all I in Index_256 range J + Len + 1 .. 255 => F_Hat (I) = F_Hat'Loop_Entry (I));
+            --  Elements from J + Len .. 255 are unchanged
+            (for all I in Index_256 range J + Len .. 255 => F_Hat (I) = F_Hat'Loop_Entry (I));
+
+         T := FQMul (Zeta_ExpC (ZI), F_Hat (J + Len));
+         F_Hat (J + Len) := F_Hat (J) - T;
+         F_Hat (J)       := F_Hat (J) + T;
+
+--         pragma Loop_Invariant
+--            -- Elements 0 .. Start - 1 are unchanged
+--           (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+--         pragma Loop_Invariant
+--           (
+--            -- Elements Start through J are updated
+--            (for all I in Index_256 range Start .. J =>
+--             ((F_Hat (I) >= F_Hat'Loop_Entry (I) - Q) and
+--              (F_Hat (I) <= F_Hat'Loop_Entry (I) + Q)
+--             )
+--            )
+--           );
+--         pragma Loop_Invariant
+--            -- Elements J + 1 .. Start + Len - 1 are unchanged
+--            (for all I in Index_256 range J + 1 .. Start + Len - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+--         pragma Loop_Invariant
+--            --  Elements Start + Len through J + Len are updated
+--            (for all I in Index_256 range Start .. J =>
+--             ((F_Hat (I + Len) >= F_Hat'Loop_Entry (I) - Q) and
+--              (F_Hat (I + Len) <= F_Hat'Loop_Entry (I) + Q))
+--            );
+--         pragma Loop_Invariant
+--            --  Elements from J + Len + 1 .. 255 are unchanged
+--            (for all I in Index_256 range J + Len + 1 .. 255 => F_Hat (I) = F_Hat'Loop_Entry (I));
 
       end loop;
-
-
-
    end NTT_Inner;
 
 
 
    procedure NTT (F : in out Poly_Zq)
    is
-      Len, J  : Index_256;
-      Start   : I32;
-      K       : Byte;
-      Zeta, T : I16;
+      Len   : Index_256;
+      Start : I32;
+      K     : Byte;
    begin
       Len := 128;
       K   := 1;
@@ -159,9 +244,9 @@ is
                                 Len = 128);
          pragma Loop_Invariant (Len >= 2);
          pragma Loop_Invariant (Len <= 128);
-         pragma Loop_Invariant (Start >= 0);
+--         pragma Loop_Invariant (Start >= 0);
          pragma Loop_Invariant (Start <= 256 - (2 * Len));
-         pragma Loop_Invariant (K = Byte (256 / (Len * 2)));
+--         pragma Loop_Invariant (K = Byte (256 / (Len * 2)));
 
          loop
             pragma Loop_Invariant (Len = 2 or
@@ -175,13 +260,10 @@ is
             pragma Loop_Invariant (Len <= 128);
             pragma Loop_Invariant (Start >= 0);
             pragma Loop_Invariant (Start <= 256 - (2 * Len));
-            pragma Loop_Invariant (K = Byte ((Start + 256) / (Len * 2)));
+--            pragma Loop_Invariant (K = Byte ((Start + 256) / (Len * 2)));
 
-            Zeta := Zeta_ExpC (K);
-            Put_Line ("Len =" & Len'Img & " Start =" & Start'Img);
+            NTT_Inner (F, K, Start, Len);
             K := K + 1;
-
-            NTT_Inner (F, Zeta, Start, Len);
 
             Start := Start + (Len * 2);
             exit when Start >= 256;
@@ -190,6 +272,11 @@ is
          exit when Len = 2;
          Len := Len / 2;
       end loop;
+
+      for K in F'range loop
+         F (K) := BR (F (K));
+      end loop;
+
    end NTT;
 
 ---------------------------------------
@@ -301,19 +388,42 @@ is
    end NTT_Inner64;
 
 
+   procedure Do_Layers_3_4 (F : in out Poly_Zq)
+      with Pre  => (for all I in F'Range => F (I) in Mont_Range3),
+           Post => (for all I in F'Range => F (I) in Mont_Range5)
+   is
+   begin
+      --  LAYER 3 I = 2 -----------------
+      NTT_Inner (F, 4, 0, 32);
+      NTT_Inner (F, 5, 64, 32);
+      NTT_Inner (F, 6, 128, 32);
+      NTT_Inner (F, 7, 192, 32);
 
+      pragma Assert (for all I in F'Range => F (I) in Mont_Range4);
 
+      NTT_Inner (F, 8,    0, 16);
+      NTT_Inner (F, 9,   32, 16);
+      NTT_Inner (F, 10,  64, 16);
+      NTT_Inner (F, 11,  96, 16);
+      NTT_Inner (F, 12, 128, 16);
+      NTT_Inner (F, 13, 160, 16);
+      NTT_Inner (F, 14, 192, 16);
+      NTT_Inner (F, 15, 224, 16);
+
+      pragma Assert (for all I in F'Range => F (I) in Mont_Range5);
+   end Do_Layers_3_4;
 
 
    procedure NTTu (F : in out Poly_Zq)
 --      with SPARK_Mode => Off
    is
    begin
+      --  LAYER 1 I = 0 -----------------
       NTT_Inner128 (F_Hat => F,
                     Zeta  => Zeta_ExpC (1));
-      --------------
       pragma Assert (for all I in F'Range => F (I) in Mont_Range2);
 
+      --  LAYER 2 I = 1 -----------------
       NTT_Inner64 (F_Hat => F,
                    Zeta  => Zeta_ExpC (2),
                    Start => 0);
@@ -335,47 +445,43 @@ is
       --  Therefore, ALL elements of F are in Mont_Range3
       pragma Assert (for all I in F'Range => F (I) in Mont_Range3);
 
-      --------------
-      for J in I32 range 0 .. 3 loop
-         NTT_Inner (F_Hat => F,
-                    Zeta  => Zeta_ExpC (4 + Byte (J)),
-                    Start => J * 2 * 32,
-                    Len   => 32);
-      end loop;
-      pragma Assert (for all I in F'Range => F (I) in Mont_Range4);
-      -- I = 3 -----------------
-      for J in I32 range 0 .. 7 loop
-         NTT_Inner (F_Hat => F,
-                    Zeta  => Zeta_ExpC (8 + Byte (J)),
-                    Start => J * 2 * 16,
-                    Len   => 16);
-      end loop;
-      pragma Assert (for all I in F'Range => F (I) in Mont_Range5);
-      -- I = 4 -----------------
+      Do_Layers_3_4 (F);
+
+      -- LAYER 5 I = 4 -----------------
       for J in I32 range 0 .. 15 loop
          NTT_Inner (F_Hat => F,
-                    Zeta  => Zeta_ExpC (16 + Byte (J)),
+                    ZI    => 16 + Byte (J),
                     Start => J * 2 * 8,
                     Len   => 8);
       end loop;
       pragma Assert (for all I in F'Range => F (I) in Mont_Range6);
-      -- I = 5 -----------------
+
+      -- LAYER 6 I = 5 -----------------
       for J in I32 range 0 .. 31 loop
          NTT_Inner (F_Hat => F,
-                    Zeta  => Zeta_ExpC (32 + Byte (J)),
+                    ZI    => 32 + Byte (J),
                     Start => J * 2 * 4,
                     Len   => 4);
       end loop;
       pragma Assert (for all I in F'Range => F (I) in Mont_Range7);
-      -- I = 6 -----------------
+
+      -- LAYER 7 I = 6 -----------------
       for J in I32 range 0 .. 63 loop
          NTT_Inner (F_Hat => F,
-                    Zeta  => Zeta_ExpC (64 + Byte (J)),
+                    ZI    => 64 + Byte (J),
                     Start => J * 2 * 2,
                     Len   => 2);
       end loop;
       -------------------
       pragma Assert (for all I in F'Range => F (I) in Mont_Range8);
+
+      --  Should do Barrett Reduction here
+      for K in F'range loop
+         F (K) := BR (F (K));
+      end loop;
+
+      pragma Assert (for all I in F'Range => F (I) in Mont_Range);
+
    end NTTu;
 
 end ENTTRef;
