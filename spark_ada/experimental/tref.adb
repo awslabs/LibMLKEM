@@ -1,4 +1,4 @@
-with RMerge; use RMerge;
+with RMerge2; use RMerge2;
 with Ada.Text_IO; use Ada.Text_IO;
 with Interfaces; use Interfaces;
 procedure TRef
