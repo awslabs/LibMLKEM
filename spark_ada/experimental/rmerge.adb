@@ -12,6 +12,7 @@ is
    --  returns equivalent of X >> 26 in C, doing an arithmetic
    --  shift right when X is negative, assuming 2's complement
    --  representation
+   pragma Warnings (GNATprove, Off, "no returning annotation*", Reason => "Not needed");
    function ASR32_26 (X : in I32) return I32
    is (Shift_Right_Arithmetic (X, 26))
      with Post => (if X >= 0 then ASR32_26'Result = X / C26 else
@@ -136,7 +137,10 @@ is
        T2 := To16 (T * Q);
        T := Integer_32 (A) - Integer_32 (T2);
        T2 := To16 (T);
+
        R := BRange (T2);
+       pragma Annotate (GNATprove, False_Positive, "range check*", "OK");
+
        return R;
    end Barrett_Reduce;
 
