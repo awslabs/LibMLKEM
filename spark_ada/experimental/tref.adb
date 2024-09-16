@@ -1,9 +1,10 @@
 with RMerge2; use RMerge2;
 with Ada.Text_IO; use Ada.Text_IO;
-with Interfaces; use Interfaces;
+with Interfaces.C; use Interfaces.C;
+with CPUCycles;
 procedure TRef
 is
-   P1, P2, P3 : Poly_Zq;
+   P1 : Poly_Zq;
 
    procedure PP (F : in Poly_Zq)
    is
@@ -14,43 +15,19 @@ is
       New_Line (2);
    end PP;
 
+   Count1, Count2, E : Long_Long;
 begin
+   Count1 := CPUCycles.Get_CPUCycles;
+   P1 := (others => 3);
 
-   P1 := (others => 6);
-   P2 := P1;
-   P3 := P1;
-
-   NTT  (P2);
-   CNTT (P3);
-
-   PP (P1);
-   Put_Line ("SPARK");
-   PP (P2);
-   Put_Line ("C");
-   PP (P3);
-
-   for I in 1 .. 1_000 loop
-
-      P2 := P1;
-      P3 := P1;
-
-      CNTT (P2);
-      NTT (P3);
-
-      if P2 = P3 then
-         null;
-      else
-         Put_Line ("Fail P2 /= P3");
-         raise Program_Error;
-      end if;
-
-      P1 (Index_256 (I mod 256)) := (P1 (Index_256 (I mod 256)) + 1) mod Q;
+   Count1 := CPUCycles.Get_CPUCycles;
+   for I in 0 .. 999 loop
+      NTT  (P1);
    end loop;
+   Count2 := CPUCycles.Get_CPUCycles;
+   E := Count2 - Count1;
 
-   Put_Line ("Final SPARK");
-   PP (P2);
-   Put_Line ("Final C");
-   PP (P3);
-
-   Put_Line ("Pass");
+   Put_Line ("Result...");
+   PP (P1);
+   Put_Line ("Cycles = " & E'Img);
 end TRef;
