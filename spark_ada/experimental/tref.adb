@@ -1,6 +1,7 @@
 with RMerge2; use RMerge2;
 with Ada.Text_IO; use Ada.Text_IO;
 with Interfaces.C; use Interfaces.C;
+with Interfaces.C.Strings; use Interfaces.C.Strings;
 with CPUCycles;
 procedure TRef
 is
@@ -16,7 +17,12 @@ is
    end PP;
 
    Count1, Count2, E : Long_Long;
+   I : chars_ptr;
 begin
+   I := CPUCycles.Get_CPUCycles_Implementation;
+
+   Put_Line ("Implem is " & To_Ada (Value (I)));
+
    Count1 := CPUCycles.Get_CPUCycles;
    P1 := (others => 3);
 
