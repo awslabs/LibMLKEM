@@ -435,30 +435,22 @@ is
                                Start : in     Index_256)
    is
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
+
+      CI0 : constant Index_256 := Start;
+      CI1 : constant Index_256 := CI0 + 1;
+      CI2 : constant Index_256 := CI0 + 2;
+      CI3 : constant Index_256 := CI0 + 3;
+      C0  : constant I16 := F (CI0);
+      C1  : constant I16 := F (CI1);
+      C2  : constant I16 := F (CI2);
+      C3  : constant I16 := F (CI3);
+      ZC2 : constant I16 := FQMul (Zeta, C2);
+      ZC3 : constant I16 := FQMul (Zeta, C3);
    begin
-      for J in Index_256 range Start .. Start + 1 loop
-         pragma Loop_Invariant
-            (for all I in Index_256 range 0          .. Start - 1 => F (I) = F'Loop_Entry (I));
-         pragma Loop_Invariant
-            (for all I in Index_256 range Start      .. J - 1     => F (I) in Mont_Range8);
-         pragma Loop_Invariant
-            (for all I in Index_256 range J         .. Start + 1 => F (I) = F'Loop_Entry (I));
-         pragma Loop_Invariant
-            (for all I in Index_256 range Start + 2 .. J + 1     => F (I) in Mont_Range8);
-         pragma Loop_Invariant
-            (for all I in Index_256 range J + 2     .. 255       => F (I) = F'Loop_Entry (I));
-
-         declare
-            J2  : constant Index_256 := J + 2;
-            FJ2 : constant I16 := F (J2);
-            T   : constant Mont_Range := FQMul (Zeta, FJ2);
-            FJ  : constant I16 := F (J);
-         begin
-            F (J + 2) := FJ - T;
-            F (J)     := FJ + T;
-         end;
-
-      end loop;
+      F (CI0) := C0 + ZC2;
+      F (CI1) := C1 + ZC3;
+      F (CI2) := C0 - ZC2;
+      F (CI3) := C1 - ZC3;
    end NTT_Inner7_Slice;
 
 
