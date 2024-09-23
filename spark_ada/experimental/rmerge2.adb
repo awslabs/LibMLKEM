@@ -22,7 +22,8 @@ is
    Zeta_Max : constant :=  1653;
    subtype Zeta_Range is I16 range Zeta_Min .. Zeta_Max;
 
-   subtype SU7 is Byte range 0 .. 127;
+   subtype SU7 is I32 range 0 .. 127;
+
    type Zeta_Exp_Table_Type is array (SU7) of Zeta_Range;
 
    Zeta_ExpC : constant Zeta_Exp_Table_Type :=
@@ -57,6 +58,7 @@ is
    subtype Mont_Range6 is I16 range -6 * QM1 .. 6 * QM1;
    subtype Mont_Range7 is I16 range -7 * QM1 .. 7 * QM1;
    subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
+
 
    --  Given
    --     int32_t a;
@@ -146,6 +148,11 @@ is
 
    function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta
                    B : in I16) return Mont_Range
+     with Global => null,
+          Inline_Always;
+
+   function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta
+                   B : in I16) return Mont_Range
    is
       D : Mont_Domain;
    begin
@@ -154,6 +161,79 @@ is
       D := I32 (Z) * I32 (B);
       return Montgomery_Reduce (D);
    end FQMul;
+
+
+
+
+   procedure NTT_Inner (F_Hat : in out Poly_Zq;
+                        ZI    : in     SU7;
+                        Start : in     Index_256;
+                        Len   : in     Index_256)
+       with No_Inline,
+            Global => null,
+            Pre    => Start <= 252 and
+                      Start + 2 * Len <= 256 and
+                      (for all K in Index_256 => F_Hat (K) in Mont_Range7),
+            Post   =>
+                      -- Elements 0 .. Start - 1 are unchanged
+                      (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Old (I))
+                     and
+                      (
+                       -- Elements Start through Start + 2 * Len - 1 are updated
+                      (for all I in Index_256 range Start .. Start + (Len - 1) =>
+                       ((F_Hat (I)       >= F_Hat'Old (I) - Q) and
+                        (F_Hat (I)       <= F_Hat'Old (I) + Q) and
+                        (F_Hat (I + Len) >= F_Hat'Old (I) - Q) and
+                        (F_Hat (I + Len) <= F_Hat'Old (I) + Q)
+                       )
+                       )
+                      )
+                    and
+                      --  Elements from Start + 2 * Len .. 255 are unchanged
+                      (for all I in Index_256 range Start + 2 * Len  .. 255 => F_Hat (I) = F_Hat'Old (I));
+
+   procedure NTT_Inner (F_Hat : in out Poly_Zq;
+                        ZI    : in     SU7;
+                        Start : in     Index_256;
+                        Len   : in     Index_256)
+   is
+      T : Mont_Range;
+   begin
+      for J in Index_256 range Start .. Start + (Len - 1) loop
+         pragma Loop_Invariant
+            -- Elements 0 .. Start - 1 are unchanged
+           (for all I in Index_256 range 0 .. Start - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+         pragma Loop_Invariant
+           (
+            -- Elements Start through J - 1 are updated
+            (for all I in Index_256 range Start .. J - 1 =>
+             ((F_Hat (I) >= F_Hat'Loop_Entry (I) - Q) and
+              (F_Hat (I) <= F_Hat'Loop_Entry (I) + Q)
+             )
+            )
+           );
+         pragma Loop_Invariant
+            -- Elements J .. Start + Len - 1 are unchanged
+            (for all I in Index_256 range J .. Start + Len - 1 => F_Hat (I) = F_Hat'Loop_Entry (I));
+         pragma Loop_Invariant
+            --  Elements Start + Len through J + Len - 1 are updated
+            (for all I in Index_256 range Start .. J - 1 =>
+             ((F_Hat (I + Len) >= F_Hat'Loop_Entry (I) - Q) and
+              (F_Hat (I + Len) <= F_Hat'Loop_Entry (I) + Q))
+            );
+         pragma Loop_Invariant
+            --  Elements from J + Len .. 255 are unchanged
+            (for all I in Index_256 range J + Len .. 255 => F_Hat (I) = F_Hat'Loop_Entry (I));
+
+         T := FQMul (Zeta_ExpC (ZI), F_Hat (J + Len));
+         F_Hat (J + Len) := F_Hat (J) - T;
+         F_Hat (J)       := F_Hat (J) + T;
+      end loop;
+   end NTT_Inner;
+
+
+
+
 
    procedure NTT_Inner12 (F : in out Poly_Zq)
        with Global => null,
@@ -219,6 +299,137 @@ is
 
    end NTT_Inner12;
 
+   procedure NTT_Inner123 (F : in out Poly_Zq)
+       with Global => null,
+            Pre  => (for all K in Index_256 => F (K) in Mont_Range),
+            Post => (for all K in Index_256 => F (K) in Mont_Range4);
+
+   procedure NTT_Inner123 (F : in out Poly_Zq)
+   is
+      Z1 : constant Zeta_Range := Zeta_ExpC (1);
+      Z2 : constant Zeta_Range := Zeta_ExpC (2);
+      Z3 : constant Zeta_Range := Zeta_ExpC (3);
+      Z4 : constant Zeta_Range := Zeta_ExpC (4);
+      Z5 : constant Zeta_Range := Zeta_ExpC (5);
+      Z6 : constant Zeta_Range := Zeta_ExpC (6);
+      Z7 : constant Zeta_Range := Zeta_ExpC (7);
+   begin
+      for J in Index_256 range 0 .. 31 loop
+
+--  This loop invariant is equivalent to those below, but defies proof with
+--  Z3, CVC4, CVC5 etc, so stick with the expanded version for now.
+--         pragma Loop_Invariant
+--           (for all K in Index_256 range 0 .. 7 =>
+--              ((for all I in Index_256 range K * 32     .. K * 32 + J - 1   => (F (I) in Mont_Range4)) and
+--               (for all I in Index_256 range K * 32 + J .. (K + 1) * 32 - 1 => (F (I) = F'Loop_Entry (I))))
+--           );
+
+         pragma Loop_Invariant
+           (for all I in Index_256 range 0 .. J - 1 => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range J .. 31 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 32 .. 31 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 32 + J .. 63 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 64 .. 63 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 64 + J .. 95 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 96 .. 95 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 96 + J .. 127 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 128 .. 127 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 128 + J .. 159 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 160 .. 159 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 160 + J .. 191 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 192 .. 191 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 192 + J .. 223 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 124 .. 223 + J => (F (I) in Mont_Range4));
+         pragma Loop_Invariant
+           (for all I in Index_256 range 224 + J .. 255 => (F (I) = F'Loop_Entry (I)));
+
+         declare
+            CI1 : constant Index_256 := J;
+            CI2 : constant Index_256 := J + 32;
+            CI3 : constant Index_256 := J + 64;
+            CI4 : constant Index_256 := J + 96;
+            CI5 : constant Index_256 := J + 128;
+            CI6 : constant Index_256 := J + 160;
+            CI7 : constant Index_256 := J + 192;
+            CI8 : constant Index_256 := J + 224;
+
+            C1 : I16 renames F (CI1);
+            C2 : I16 renames F (CI2);
+            C3 : I16 renames F (CI3);
+            C4 : I16 renames F (CI4);
+            C5 : I16 renames F (CI5);
+            C6 : I16 renames F (CI6);
+            C7 : I16 renames F (CI7);
+            C8 : I16 renames F (CI8);
+            T : Mont_Range;
+         begin
+            -- Layer 1
+            T  := FQMul (Z1, C5);
+            C5 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z1, C7);
+            C7 := C3 - T;
+            C3 := C3 + T;
+
+            T  := FQMul (Z1, C6);
+            C6 := C2 - T;
+            C2 := C2 + T;
+
+            T  := FQMul (Z1, C8);
+            C8 := C4 - T;
+            C4 := C4 + T;
+
+            -- Layer 2
+            T  := FQMul (Z2, C3);
+            C3 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z3, C7);
+            C7 := C5 - T;
+            C5 := C5 + T;
+
+            T  := FQMul (Z2, C4);
+            C4 := C2 - T;
+            C2 := C2 + T;
+
+            T  := FQMul (Z3, C8);
+            C8 := C6 - T;
+            C6 := C6 + T;
+
+            -- Layer 3
+            T  := FQMul (Z4, C2);
+            C2 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z5, C4);
+            C4 := C3 - T;
+            C3 := C3 + T;
+
+            T  := FQMul (Z6, C6);
+            C6 := C5 - T;
+            C5 := C5 + T;
+
+            T  := FQMul (Z7, C8);
+            C8 := C7 - T;
+            C7 := C7 + T;
+         end;
+      end loop;
+   end NTT_Inner123;
 
    procedure NTT_Inner34_Slice (F     : in out Poly_Zq;
                                 ZI    : in     SU7;
@@ -311,6 +522,190 @@ is
       NTT_Inner34_Slice (F, 6, 128);
       NTT_Inner34_Slice (F, 7, 192);
    end NTT_Inner34;
+
+
+   procedure NTT_Inner456_Slice (F     : in out Poly_Zq;
+                                 ZI    : in     SU7;
+                                 Start : in     Index_256)
+       with Global => null,
+            Pre  => ZI in 8 .. 15 and then
+                    Start <= 224 and then
+                    (for all I in Index_256 range Start      .. Start + 31 => (F (I) in Mont_Range4)),
+            Post => ((for all I in Index_256 range 0          .. Start - 1  => (F (I) = F'Old (I))) and
+                     (for all I in Index_256 range Start      .. Start + 31 => (F (I) in Mont_Range7)) and
+                     (for all I in Index_256 range Start + 32 .. 255        => (F (I) = F'Old (I))));
+
+   procedure NTT_Inner456_Slice (F     : in out Poly_Zq;
+                                 ZI    : in     SU7;
+                                 Start : in     Index_256)
+   is
+      ZI1 : constant SU7 := ZI;
+      ZI2 : constant SU7 := ZI * 2;
+      ZI3 : constant SU7 := ZI * 2 + 1;
+      Z1 : constant Zeta_Range := Zeta_ExpC (ZI1);
+      Z2 : constant Zeta_Range := Zeta_ExpC (ZI2);
+      Z3 : constant Zeta_Range := Zeta_ExpC (ZI3);
+      Z4 : constant Zeta_Range := Zeta_ExpC (ZI2 * 2);
+      Z5 : constant Zeta_Range := Zeta_ExpC (ZI2 * 2 + 1);
+      Z6 : constant Zeta_Range := Zeta_ExpC (ZI3 * 2);
+      Z7 : constant Zeta_Range := Zeta_ExpC (ZI3 * 2 + 1);
+      T : I16;
+   begin
+      -- NTT_Inner (F, Z1,  Start,     16);
+      -- NTT_Inner (F, Z2,  Start,      8);
+      -- NTT_Inner (F, Z3,  Start + 16, 8);
+      -- NTT_Inner (F, Z4,  Start,      4);
+      -- NTT_Inner (F, Z5,  Start + 8,  4);
+      -- NTT_Inner (F, Z6,  Start + 16, 4);
+      -- NTT_Inner (F, Z7,  Start + 24, 4);
+
+      for J in Index_256 range 0 .. 3 loop
+
+
+         pragma Loop_Invariant
+           (for all I in Index_256 range 0 .. Start - 1 => (F (I) = F'Loop_Entry (I)));
+
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 0 .. Start + J - 1 => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + J .. Start + 3 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 4 .. Start + 3 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 4 + J .. Start + 7 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 8 .. Start + 7 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 8 + J .. Start + 11 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 12 .. Start + 11 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 12 + J .. Start + 15 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 16 .. Start + 15 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 16 + J .. Start + 19 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 20 .. Start + 19 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 20 + J .. Start + 23 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 24 .. Start + 23 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 24 + J .. Start + 27 => (F (I) = F'Loop_Entry (I)));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 28 .. Start + 27 + J => (F (I) in Mont_Range7));
+         pragma Loop_Invariant
+           (for all I in Index_256 range Start + 28 + J .. 255 => (F (I) = F'Loop_Entry (I)));
+
+
+         declare
+            CI1 : constant Index_256 := J + Start;
+            CI2 : constant Index_256 := CI1 + 4;
+            CI3 : constant Index_256 := CI1 + 8;
+            CI4 : constant Index_256 := CI1 + 12;
+            CI5 : constant Index_256 := CI1 + 16;
+            CI6 : constant Index_256 := CI1 + 20;
+            CI7 : constant Index_256 := CI1 + 24;
+            CI8 : constant Index_256 := CI1 + 28;
+
+            C1 : I16 renames F (CI1);
+            C2 : I16 renames F (CI2);
+            C3 : I16 renames F (CI3);
+            C4 : I16 renames F (CI4);
+            C5 : I16 renames F (CI5);
+            C6 : I16 renames F (CI6);
+            C7 : I16 renames F (CI7);
+            C8 : I16 renames F (CI8);
+         begin
+            -- Layer 4
+            T  := FQMul (Z1, C5);
+            C5 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z1, C6);
+            C6 := C2 - T;
+            C2 := C2 + T;
+
+            T  := FQMul (Z1, C7);
+            C7 := C3 - T;
+            C3 := C3 + T;
+
+            T  := FQMul (Z1, C8);
+            C8 := C4 - T;
+            C4 := C4 + T;
+
+            -- Layer 5
+            T  := FQMul (Z2, C3);
+            C3 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z3, C7);
+            C7 := C5 - T;
+            C5 := C5 + T;
+
+            T  := FQMul (Z2, C4);
+            C4 := C2 - T;
+            C2 := C2 + T;
+
+            T  := FQMul (Z3, C8);
+            C8 := C6 - T;
+            C6 := C6 + T;
+
+            -- Layer 6
+            T  := FQMul (Z4, C2);
+            C2 := C1 - T;
+            C1 := C1 + T;
+
+            T  := FQMul (Z5, C4);
+            C4 := C3 - T;
+            C3 := C3 + T;
+
+            T  := FQMul (Z6, C6);
+            C6 := C5 - T;
+            C5 := C5 + T;
+
+            T  := FQMul (Z7, C8);
+            C8 := C7 - T;
+            C7 := C7 + T;
+         end;
+      end loop;
+   end NTT_Inner456_Slice;
+
+   procedure NTT_Inner456 (F : in out Poly_Zq)
+      with Pre  => (for all I in F'Range => F (I) in Mont_Range4),
+           Post => (for all I in F'Range => F (I) in Mont_Range7)
+   is
+   begin
+      NTT_Inner456_Slice (F,  8,   0);
+      NTT_Inner456_Slice (F,  9,  32);
+      NTT_Inner456_Slice (F, 10,  64);
+      NTT_Inner456_Slice (F, 11,  96);
+      NTT_Inner456_Slice (F, 12, 128);
+      NTT_Inner456_Slice (F, 13, 160);
+      NTT_Inner456_Slice (F, 14, 192);
+      NTT_Inner456_Slice (F, 15, 224);
+   end NTT_Inner456;
+
+   procedure NTT_Inner4 (F : in out Poly_Zq)
+      with Pre  => (for all I in F'Range => F (I) in Mont_Range4),
+           Post => (for all I in F'Range => F (I) in Mont_Range5)
+   is
+   begin
+      NTT_Inner (F, 8,    0, 16);
+      NTT_Inner (F, 9,   32, 16);
+      NTT_Inner (F, 10,  64, 16);
+      NTT_Inner (F, 11,  96, 16);
+      NTT_Inner (F, 12, 128, 16);
+      NTT_Inner (F, 13, 160, 16);
+      NTT_Inner (F, 14, 192, 16);
+      NTT_Inner (F, 15, 224, 16);
+   end NTT_Inner4;
+
+
+
+
+
 
    procedure NTT_Inner56_Slice (F     : in out Poly_Zq;
                                 ZI    : in     SU7;
@@ -468,7 +863,7 @@ is
          pragma Loop_Invariant (for all I in Index_256 range J * 4  .. 255       => F (I) = F'Loop_Entry (I));
 
          NTT_Inner7_Slice (F     => F,
-                           ZI    => 64 + Byte (J),
+                           ZI    => J + 64,
                            Start => J * 4);
       end loop;
    end NTT_Inner7;
@@ -476,9 +871,14 @@ is
    procedure NTT (F : in out Poly_Zq)
    is
    begin
-      NTT_Inner12 (F);
-      NTT_Inner34 (F);
-      NTT_Inner56 (F);
+--      NTT_Inner12 (F);
+--      NTT_Inner34 (F);
+--      NTT_Inner56 (F);
+
+--      NTT_Inner4 (F);
+
+      NTT_Inner123 (F);
+      NTT_Inner456 (F);
       NTT_Inner7  (F);
 
       for K in F'Range loop
