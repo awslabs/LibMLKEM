@@ -73,7 +73,12 @@ private
 
 
    subtype Mont_Range2 is I16 range -2 * QM1 .. 2 * QM1;
+   subtype Mont_Range3 is I16 range -3 * QM1 .. 3 * QM1;
+   subtype Mont_Range4 is I16 range -4 * QM1 .. 4 * QM1;
+   subtype Mont_Range5 is I16 range -5 * QM1 .. 5 * QM1;
+   subtype Mont_Range6 is I16 range -6 * QM1 .. 6 * QM1;
    subtype Mont_Range7 is I16 range -7 * QM1 .. 7 * QM1;
+   subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
 
 
    function Barrett_Reduce (A : in Integer_16) return BRange

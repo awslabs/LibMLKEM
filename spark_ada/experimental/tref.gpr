@@ -9,8 +9,8 @@ is
         ("-gnat2022",
          "-gnatwaJ",
          "-gnaty-s",
---         "-gnatp",
-         "-gnata",
+--         "-gnatp", -- Suppress all runtime checks
+         "-gnata", -- All assertions and contracts ON
          "-O1",
 --         "-g",
          "-ffunction-sections", -- Create a linker section for each function
@@ -26,9 +26,9 @@ is
                                       "--no-loop-unrolling",
                                       "--level=1",
                                       "--prover=z3,cvc4,altergo",
-                                      "--timeout=5",
+                                      "--timeout=10",
                                       "--memlimit=0",
-                                      "--steps=50000",
+                                      "--steps=100000",
                                       "--report=statistics");
    end Prove;
 

@@ -449,7 +449,10 @@ is
    procedure Layer6 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range2),
+          Pre  => ((for all K in I32 range 0 .. 63 => F (K * 4)     in Mont_Range2) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 1) in Mont_Range2) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 2) in Mont_Range) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 3) in Mont_Range)),
           Post => (for all K in Index_256 => F (K) in Mont_Range2);
 
    procedure Layer6 (F : in out Poly_Zq)
@@ -469,9 +472,13 @@ is
                              ZI    : in     SU7;
                              Start : in     Index_256)
      with Global => null,
-          Pre    => Start <= 252 and then
-                    (for all K in Index_256 => F (K) in Mont_Range2),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre  => ZI in 64 .. 127 and then
+                  Start <= 252 and then
+                  (for all I in Index_256 range Start .. Start + 3 => (F (I) in Mont_Range)),
+          Post => ((for all I in Index_256 range 0         .. Start - 1 => (F (I) = F'Old (I))) and
+                   (for all I in Index_256 range Start     .. Start + 1 => (F (I) in Mont_Range2)) and
+                   (for all I in Index_256 range Start + 2 .. Start + 3 => (F (I) in Mont_Range)) and
+                   (for all I in Index_256 range Start + 4 .. 255       => (F (I) = F'Old (I))));
 
    procedure NTT_Inv_Inner7 (F     : in out Poly_Zq;
                              ZI    : in     SU7;
@@ -487,10 +494,10 @@ is
       C2  : constant I16 := F (CI2);
       C3  : constant I16 := F (CI3);
    begin
-      F (CI0) := Barrett_Reduce (C0 + C2);
+      F (CI0) := C0 + C2; --  Defer reduction,
       F (CI2) := FQMul (Zeta, (C2 - C0));
 
-      F (CI1) := Barrett_Reduce (C1 + C3);
+      F (CI1) := C1 + C3; --  Defer reduction
       F (CI3) := FQMul (Zeta, (C3 - C1));
    end NTT_Inv_Inner7;
 
@@ -498,15 +505,22 @@ is
    procedure Layer7 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range2),
-          Post => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range),
+          Post => ((for all K in I32 range 0 .. 63 => F (K * 4)     in Mont_Range2) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 1) in Mont_Range2) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 2) in Mont_Range) and
+                   (for all K in I32 range 0 .. 63 => F (K * 4 + 3) in Mont_Range));
 
    procedure Layer7 (F : in out Poly_Zq)
    is
    begin
       for J in I32 range 0 .. 63 loop
          NTT_Inv_Inner7 (F, 127 - J, J * 4);
-         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I32 range 0 .. J => F (K * 4)     in Mont_Range2);
+         pragma Loop_Invariant (for all K in I32 range 0 .. J => F (K * 4 + 1) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I32 range 0 .. J => F (K * 4 + 2) in Mont_Range);
+         pragma Loop_Invariant (for all K in I32 range 0 .. J => F (K * 4 + 3) in Mont_Range);
+         pragma Loop_Invariant (for all K in I32 range J * 4 + 4 .. 255 => F (K) in Mont_Range);
       end loop;
    end Layer7;
 
