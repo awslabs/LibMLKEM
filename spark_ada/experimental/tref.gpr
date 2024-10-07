@@ -9,9 +9,9 @@ is
         ("-gnat2022",
          "-gnatwaJ",
          "-gnaty-s",
-         "-gnatp",
---         "-gnata",
-         "-O3",
+--         "-gnatp",
+         "-gnata",
+         "-O1",
 --         "-g",
          "-ffunction-sections", -- Create a linker section for each function
          "-fdata-sections");    -- Create a linker section for each data
