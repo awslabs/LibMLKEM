@@ -9,10 +9,14 @@ is
         ("-gnat2022",
          "-gnatwaJ",
          "-gnaty-s",
---         "-gnatp", -- Suppress all runtime checks
-         "-gnata", -- All assertions and contracts ON
-         "-O1",
+
+--         "-gnata", -- All assertions and contracts ON
+--         "-O1",
 --         "-g",
+
+         "-gnatp", -- Suppress all runtime checks
+         "-O3",
+
          "-ffunction-sections", -- Create a linker section for each function
          "-fdata-sections");    -- Create a linker section for each data
    end Compiler;
