@@ -4,7 +4,7 @@ tref: tref.adb rmerge2.ads rmerge2.adb rmerge2-inv.ads rmerge2-inv.adb ntt.o
 	gprbuild -Ptref
 
 ntt.o: ntt.h ntt.c
-	gcc -c ntt.c
+	gcc -c -O3 ntt.c
 
 clean:
 	rm -f ntt.o
