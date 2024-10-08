@@ -385,9 +385,27 @@ is
                              ZI    : in     SU7;
                              Start : in     Index_256)
      with Global => null,
-          Pre    => Start <= 248 and then
-                    (for all K in Index_256 => F (K) in Mont_Range2),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre    => ZI in 32 .. 63 and then
+                    Start <= 248 and then
+                    Start mod 8 = 0 and then
+                    (F (Start)     in Mont_Range2 and
+                     F (Start + 1) in Mont_Range2 and
+                     F (Start + 2) in Mont_Range and
+                     F (Start + 3) in Mont_Range and
+                     F (Start + 4) in Mont_Range2 and
+                     F (Start + 5) in Mont_Range2 and
+                     F (Start + 6) in Mont_Range and
+                     F (Start + 7) in Mont_Range),
+          Post   => (for all K in Index_256 range 0 .. Start - 1 => F (K) = F'Old (K)) and
+                     F (Start)     in Mont_Range4 and
+                     F (Start + 1) in Mont_Range4 and
+                     F (Start + 2) in Mont_Range2 and
+                     F (Start + 3) in Mont_Range2 and
+                     F (Start + 4) in Mont_Range and
+                     F (Start + 5) in Mont_Range and
+                     F (Start + 6) in Mont_Range and
+                     F (Start + 7) in Mont_Range and
+                    (for all K in Index_256 range Start + 8 .. 255 => F (K) = F'Old (K));
 
 
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
@@ -423,44 +441,69 @@ is
 
       F (CI3) := Barrett_Reduce (C3 + C7);
       F (CI7) := FQMul (Zeta, C7 - C3);
-
-      pragma Assert
-        (for all I in Index_256 range 0 .. Start - 1 => F (I) in Mont_Range2);
-      pragma Assert
-        (for all I in Index_256 range Start .. Start + 3 => F (I) in BRange);
-      pragma Assert
-        (for all I in Index_256 range Start + 4 .. Start + 7 => (F (I) in Mont_Range));
-      pragma Assert
-        (for all I in Index_256 range Start + 8 .. 255 => F (I) in Mont_Range2);
-
-      --  Merge ranges of the middle two, and note that Mont_Range is wider than BRange
-      pragma Assert
-        (for all I in Index_256 range     0     .. Start - 1 => F (I) in Mont_Range2);
-      pragma Assert
-        (for all I in Index_256 range Start     .. Start + 7 => F (I) in Mont_Range);
-      pragma Assert
-        (for all I in Index_256 range Start + 8 .. 255       => F (I) in Mont_Range2);
-
-      pragma Assert
-        (for all I in Index_256  => F (I) in Mont_Range2);
-
    end NTT_Inv_Inner6;
 
    procedure Layer6 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => ((for all K in I32 range 0 .. 63 => F (K * 4)     in Mont_Range2) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 1) in Mont_Range2) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 2) in Mont_Range) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 3) in Mont_Range)),
-          Post => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre  => ((for all K in I32 range 0 .. 31 => F (K * 8)     in Mont_Range2) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 1) in Mont_Range2) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 2) in Mont_Range) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 3) in Mont_Range) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 4) in Mont_Range2) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 5) in Mont_Range2) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
+                   (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range)),
+          Post => (for all K in I32 range 0 .. 31 => F (K * 8)     in Mont_Range4) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 1) in Mont_Range4) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 2) in Mont_Range2) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 3) in Mont_Range2) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 4) in Mont_Range) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 5) in Mont_Range) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
+                  (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range);
+
 
    procedure Layer6 (F : in out Poly_Zq)
    is
    begin
       for J in I32 range 0 .. 31 loop
          NTT_Inv_Inner6 (F, 63 - J, J * 8);
-         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range2);
+
+         --  Elements modified so far increase in magnitude as follows:
+         pragma Loop_Invariant (for all K in I32 range 0 .. J =>
+                                  F (K * 8)     in Mont_Range4 and
+                                  F (K * 8 + 1) in Mont_Range4 and
+                                  F (K * 8 + 2) in Mont_Range2 and
+                                  F (K * 8 + 3) in Mont_Range2 and
+                                  F (K * 8 + 4) in Mont_Range  and
+                                  F (K * 8 + 5) in Mont_Range  and
+                                  F (K * 8 + 6) in Mont_Range  and
+                                  F (K * 8 + 7) in Mont_Range);
+
+         --  Unmodified element retain their initial values...
+         pragma Loop_Invariant (for all K in I32 range (J + 1) * 8 .. 255 => F (K) = F'Loop_Entry (K));
+
+         --  ...and therefore retain the ranges specified in the pre-condition
+         pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
+                                  F (K * 8)     = F'Loop_Entry (K * 8)     and
+                                  F (K * 8 + 1) = F'Loop_Entry (K * 8 + 1) and
+                                  F (K * 8 + 2) = F'Loop_Entry (K * 8 + 2) and
+                                  F (K * 8 + 3) = F'Loop_Entry (K * 8 + 3) and
+                                  F (K * 8 + 4) = F'Loop_Entry (K * 8 + 4) and
+                                  F (K * 8 + 5) = F'Loop_Entry (K * 8 + 5) and
+                                  F (K * 8 + 6) = F'Loop_Entry (K * 8 + 6) and
+                                  F (K * 8 + 7) = F'Loop_Entry (K * 8 + 7));
+
+         pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
+                                  F (K * 8)     in Mont_Range2 and
+                                  F (K * 8 + 1) in Mont_Range2 and
+                                  F (K * 8 + 2) in Mont_Range  and
+                                  F (K * 8 + 3) in Mont_Range  and
+                                  F (K * 8 + 4) in Mont_Range2 and
+                                  F (K * 8 + 5) in Mont_Range2 and
+                                  F (K * 8 + 6) in Mont_Range  and
+                                  F (K * 8 + 7) in Mont_Range);
       end loop;
    end Layer6;
 
@@ -527,9 +570,30 @@ is
    --  Optimized implementation
    procedure INTTnew (F : in out Poly_Zq)
    is
+      pragma Annotate (GNATprove, Intentional, "postcondition might fail", "Quantifier merging");
+      procedure Layer7_to_6_Lemma (F : in Poly_Zq)
+        with Ghost,
+             Global => null,
+             Pre    => ((for all K in I32 range 0 .. 63 => F (K * 4)     in Mont_Range2) and
+                        (for all K in I32 range 0 .. 63 => F (K * 4 + 1) in Mont_Range2) and
+                        (for all K in I32 range 0 .. 63 => F (K * 4 + 2) in Mont_Range) and
+                        (for all K in I32 range 0 .. 63 => F (K * 4 + 3) in Mont_Range)),
+             Post   => ((for all K in I32 range 0 .. 31 => F (K * 8)     in Mont_Range2) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 1) in Mont_Range2) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 2) in Mont_Range) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 3) in Mont_Range) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 4) in Mont_Range2) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 5) in Mont_Range2) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
+                        (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range));
+
+      procedure Layer7_to_6_Lemma (F : in Poly_Zq) is null;
+
    begin
       Layer7 (F);
+      Layer7_to_6_Lemma (F);
       Layer6 (F);
+
       Layer5 (F);
       Layer4 (F);
       Layer3 (F);

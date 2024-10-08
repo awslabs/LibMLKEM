@@ -12,3 +12,6 @@ clean:
 
 proof:
 	gnatprove -Ptref -u rmerge2-inv.adb
+
+prooff:
+	gnatprove -Ptref --report=fail -u rmerge2-inv.adb
