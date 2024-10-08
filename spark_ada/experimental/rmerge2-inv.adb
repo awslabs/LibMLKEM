@@ -430,38 +430,40 @@ is
       C6  : constant I16 := F (CI6);
       C7  : constant I16 := F (CI7);
    begin
-      F (CI0) := Barrett_Reduce (C0 + C4);
+      F (CI0) := C0 + C4; --  Defer reduction
       F (CI4) := FQMul (Zeta, C4 - C0);
 
-      F (CI1) := Barrett_Reduce (C1 + C5);
+      F (CI1) := C1 + C5; --  Defer reduction
       F (CI5) := FQMul (Zeta, C5 - C1);
 
-      F (CI2) := Barrett_Reduce (C2 + C6);
+      F (CI2) := C2 + C6; --  Defer reduction
       F (CI6) := FQMul (Zeta, C6 - C2);
 
-      F (CI3) := Barrett_Reduce (C3 + C7);
+      F (CI3) := C3 + C7; --  Defer reduction
       F (CI7) := FQMul (Zeta, C7 - C3);
    end NTT_Inv_Inner6;
 
    procedure Layer6 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => ((for all K in I32 range 0 .. 31 => F (K * 8)     in Mont_Range2) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 1) in Mont_Range2) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 2) in Mont_Range) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 3) in Mont_Range) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 4) in Mont_Range2) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 5) in Mont_Range2) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
-                   (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range)),
-          Post => (for all K in I32 range 0 .. 31 => F (K * 8)     in Mont_Range4) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 1) in Mont_Range4) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 2) in Mont_Range2) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 3) in Mont_Range2) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 4) in Mont_Range) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 5) in Mont_Range) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
-                  (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range);
+          Pre  => (for all K in I32 range 0 .. 31 =>
+                     F (K * 8)     in Mont_Range2 and
+                     F (K * 8 + 1) in Mont_Range2 and
+                     F (K * 8 + 2) in Mont_Range  and
+                     F (K * 8 + 3) in Mont_Range  and
+                     F (K * 8 + 4) in Mont_Range2 and
+                     F (K * 8 + 5) in Mont_Range2 and
+                     F (K * 8 + 6) in Mont_Range  and
+                     F (K * 8 + 7) in Mont_Range),
+          Post => (for all K in I32 range 0 .. 31 =>
+                     F (K * 8)     in Mont_Range4 and
+                     F (K * 8 + 1) in Mont_Range4 and
+                     F (K * 8 + 2) in Mont_Range2 and
+                     F (K * 8 + 3) in Mont_Range2 and
+                     F (K * 8 + 4) in Mont_Range  and
+                     F (K * 8 + 5) in Mont_Range  and
+                     F (K * 8 + 6) in Mont_Range  and
+                     F (K * 8 + 7) in Mont_Range);
 
 
    procedure Layer6 (F : in out Poly_Zq)
@@ -483,8 +485,6 @@ is
 
          --  Unmodified element retain their initial values...
          pragma Loop_Invariant (for all K in I32 range (J + 1) * 8 .. 255 => F (K) = F'Loop_Entry (K));
-
-         --  ...and therefore retain the ranges specified in the pre-condition
          pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
                                   F (K * 8)     = F'Loop_Entry (K * 8)     and
                                   F (K * 8 + 1) = F'Loop_Entry (K * 8 + 1) and
@@ -495,6 +495,8 @@ is
                                   F (K * 8 + 6) = F'Loop_Entry (K * 8 + 6) and
                                   F (K * 8 + 7) = F'Loop_Entry (K * 8 + 7));
 
+         --  ...and therefore retain the ranges specified in the pre-condition. This is
+         --  sufficient to meet the pre-condition of the _next_ call to NTT_Inv_Inner6
          pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
                                   F (K * 8)     in Mont_Range2 and
                                   F (K * 8 + 1) in Mont_Range2 and
