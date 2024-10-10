@@ -1315,6 +1315,12 @@ is
       SHAKE128.Update (Ctx, SHAKE128.Byte_Array (B));
 
       while J2 < 256 loop
+         pragma Loop_Variant (Increases => J2);
+         pragma Annotate (GNATprove,
+                          False_Positive,
+                          "loop variant might fail",
+                          "Terminates with very high probability");
+
          --  To execute this loop body once, we need exactly 3 bytes of output
          --  from the XOF function, so we fetch that many, and keep
          --  looping until the sampling terminates
@@ -1837,6 +1843,7 @@ is
          pragma Loop_Invariant
            (I >= X'First and I <= X'Last and
             (D = (for all J in N32 range X'First .. I => X (J) = Y (J))));
+         pragma Loop_Variant (Increases => I);
          exit when I = X'Last;
          I := I + 1;
       end loop;
