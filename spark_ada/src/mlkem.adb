@@ -195,11 +195,11 @@ is
    subtype NTT_Len_Bit_Index is Natural range 0 .. 6;
    subtype NTT_Len_Power     is Natural range 1 .. 7;
    --  A power of 2 between 2 and 128. Used in NTT and NTT_Inv
-   subtype Len_T is Index_256
+   subtype Len_T is Index_256 range 2 .. 128
       with Dynamic_Predicate => (for some I in NTT_Len_Power => Len_T = 2**I);
 
    --  A power of 2 between 1 and 64. Used in NTT and NTT_Inv
-   subtype Count_T is Index_256
+   subtype Count_T is Index_256 range 1 .. 64
       with Dynamic_Predicate => (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
 
    subtype Index_3   is I32 range 0 .. 2;
@@ -1563,7 +1563,17 @@ is
          Count := 2**I;
          for J in I32 range 0 .. Count - 1 loop
             pragma Loop_Invariant (Count * Len = 128);
+            --  A bit of spoon-feeding the prover here to help it work
+            --  out that J * 2 * Len <= 252
+            pragma Loop_Invariant (J <= Count - 1);
+            pragma Loop_Invariant (J * 2 <= (Count - 1) * 2);
+            pragma Loop_Invariant (J * 2 * Len <= (Count - 1) * 2 * Len);
+            pragma Loop_Invariant (J * 2 * Len <= Count * 2 * Len - 2 * Len);
+            pragma Loop_Invariant (J * 2 * Len <= 2**I * 2 * 2**(7 - I) - 2 * 2**(7 - I));
+            pragma Loop_Invariant (J * 2 * Len <= 256 - 2 * 2**(7 - I));
+            pragma Loop_Invariant (J * 2 * Len <= 256 - 2**(8 - I));
             pragma Loop_Invariant (J * 2 * Len <= 252);
+
             pragma Loop_Invariant (I32 (K) = 2**I + Count - J - 1);
 
             NTT_Inv_Inner (Zeta  => Zeta_ExpC (K),
