@@ -322,7 +322,9 @@ is
                      F (K * 16 + 13) in Mont_Range  and
                      F (K * 16 + 14) in Mont_Range  and
                      F (K * 16 + 15) in Mont_Range),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range);
+          Post   => (for all K in I32 range 0 .. 15 =>
+                       (for all L in I32 range 0 .. 15 =>
+                          F (K * 16 + L) in Mont_Range));
 
    procedure Reduce_After_Layer5 (F : in out Poly_Zq)
    is
@@ -359,8 +361,6 @@ is
       pragma Assert (for all K in I32 range 0 .. 15 =>
                         (for all L in I32 range 0 .. 15 =>
                            F (K * 16 + L) in Mont_Range));
-
-      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
 
    end Reduce_After_Layer5;
 
@@ -790,12 +790,44 @@ is
                         (for all K in I32 range 0 .. 31 => F (K * 8 + 6) in Mont_Range) and
                         (for all K in I32 range 0 .. 31 => F (K * 8 + 7) in Mont_Range));
 
+      procedure Layer6_to_5_Lemma (F : in Poly_Zq)
+        with Ghost,
+             Global => null,
+             Pre    => (for all K in I32 range 0 .. 31 =>
+                          F (K * 8)     in Mont_Range4 and
+                          F (K * 8 + 1) in Mont_Range4 and
+                          F (K * 8 + 2) in Mont_Range2 and
+                          F (K * 8 + 3) in Mont_Range2 and
+                          F (K * 8 + 4) in Mont_Range  and
+                          F (K * 8 + 5) in Mont_Range  and
+                          F (K * 8 + 6) in Mont_Range  and
+                          F (K * 8 + 7) in Mont_Range),
+             Post   => (for all K in I32 range 0 .. 15 =>
+                          F (K * 16)      in Mont_Range4 and
+                          F (K * 16 + 1)  in Mont_Range4 and
+                          F (K * 16 + 2)  in Mont_Range2 and
+                          F (K * 16 + 3)  in Mont_Range2 and
+                          F (K * 16 + 4)  in Mont_Range  and
+                          F (K * 16 + 5)  in Mont_Range  and
+                          F (K * 16 + 6)  in Mont_Range  and
+                          F (K * 16 + 7)  in Mont_Range  and
+                          F (K * 16 + 8)  in Mont_Range4 and
+                          F (K * 16 + 9)  in Mont_Range4 and
+                          F (K * 16 + 10) in Mont_Range2 and
+                          F (K * 16 + 11) in Mont_Range2 and
+                          F (K * 16 + 12) in Mont_Range  and
+                          F (K * 16 + 13) in Mont_Range  and
+                          F (K * 16 + 14) in Mont_Range  and
+                          F (K * 16 + 15) in Mont_Range);
+
       procedure Layer7_to_6_Lemma (F : in Poly_Zq) is null;
+      procedure Layer6_to_5_Lemma (F : in Poly_Zq) is null;
 
    begin
       Layer7 (F);
       Layer7_to_6_Lemma (F);
       Layer6 (F);
+      Layer6_to_5_Lemma (F);
       Layer5 (F);
 
       Reduce_After_Layer5 (F);
