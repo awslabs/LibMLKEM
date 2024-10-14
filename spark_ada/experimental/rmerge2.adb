@@ -70,6 +70,30 @@ is
 
    -- Barrett reduction
    function Barrett_Reduce (A : in Integer_16) return BRange
+     with SPARK_Mode => Off
+   is
+      pragma Suppress (All_Checks);
+      --  int16_t t;
+      --  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
+      --
+      --  t  = ((int32_t)v*a + (1<<25)) >> 26;
+      --  t *= KYBER_Q;
+      --  return a - t;
+
+       C25 : constant := 2**25;
+       V   : constant := (C26 + (Q / 2)) / Q;
+       T   : Integer_32;
+       T2  : Integer_16;
+   begin
+       T := ASR32_26 ((V * Integer_32 (A)) + C25);
+       T2 := Integer_16 (T * Q);
+       T := Integer_32 (A) - Integer_32 (T2);
+       T2 := Integer_16 (T);
+
+       return BRange (T2);
+   end Barrett_Reduce;
+
+   function Barrett_Reduce_Slow (A : in Integer_16) return BRange
    is
       --  int16_t t;
       --  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
@@ -109,7 +133,7 @@ is
        pragma Annotate (GNATprove, False_Positive, "range check*", "OK");
 
        return R;
-   end Barrett_Reduce;
+   end Barrett_Reduce_Slow;
 
 
    function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta

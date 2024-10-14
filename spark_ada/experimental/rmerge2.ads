@@ -81,8 +81,14 @@ private
    subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
 
 
-   function Barrett_Reduce (A : in Integer_16) return BRange
+   --  Slower but provable with SPARK
+   function Barrett_Reduce_Slow (A : in Integer_16) return BRange
      with Global => null;
+
+   --  Faster, but not SPARK
+   function Barrett_Reduce (A : in Integer_16) return BRange
+     with Global => null,
+          Inline_Always;
 
    function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta
                    B : in I16) return Mont_Range
