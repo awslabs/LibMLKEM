@@ -299,6 +299,71 @@ is
       end loop;
    end Layer4;
 
+   --  ===================
+   --  Reduce_After_Layer5
+   --  ===================
+   procedure Reduce_After_Layer5 (F : in out Poly_Zq)
+     with No_Inline,
+          Global => null,
+          Pre    => (for all K in I32 range 0 .. 15 =>
+                     F (K * 16)      in Mont_Range8 and
+                     F (K * 16 + 1)  in Mont_Range8 and
+                     F (K * 16 + 2)  in Mont_Range4 and
+                     F (K * 16 + 3)  in Mont_Range4 and
+                     F (K * 16 + 4)  in Mont_Range2 and
+                     F (K * 16 + 5)  in Mont_Range2 and
+                     F (K * 16 + 6)  in Mont_Range2 and
+                     F (K * 16 + 7)  in Mont_Range2 and
+                     F (K * 16 + 8)  in Mont_Range  and
+                     F (K * 16 + 9)  in Mont_Range  and
+                     F (K * 16 + 10) in Mont_Range  and
+                     F (K * 16 + 11) in Mont_Range  and
+                     F (K * 16 + 12) in Mont_Range  and
+                     F (K * 16 + 13) in Mont_Range  and
+                     F (K * 16 + 14) in Mont_Range  and
+                     F (K * 16 + 15) in Mont_Range),
+          Post   => (for all K in Index_256 => F (K) in Mont_Range);
+
+   procedure Reduce_After_Layer5 (F : in out Poly_Zq)
+   is
+   begin
+      for J in I32 range 0 .. 15 loop
+         F (J * 16)     := Barrett_Reduce (F (J * 16));
+         F (J * 16 + 1) := Barrett_Reduce (F (J * 16 + 1));
+         F (J * 16 + 2) := Barrett_Reduce (F (J * 16 + 2));
+         F (J * 16 + 3) := Barrett_Reduce (F (J * 16 + 3));
+         F (J * 16 + 4) := Barrett_Reduce (F (J * 16 + 4));
+         F (J * 16 + 5) := Barrett_Reduce (F (J * 16 + 5));
+         F (J * 16 + 6) := Barrett_Reduce (F (J * 16 + 6));
+         F (J * 16 + 7) := Barrett_Reduce (F (J * 16 + 7));
+
+         --  Elements modified are reduced.
+         pragma Loop_Invariant (for all K in I32 range 0 .. J =>
+                                  (for all L in I32 range 0 .. 7 =>
+                                     F (K * 16 + L) in Mont_Range));
+
+         --  Unmodified elements retain their initial value...
+         pragma Loop_Invariant (for all K in I32 range 0 .. J =>
+                                  (for all L in I32 range 8 .. 15 =>
+                                     F (K * 16 + L) = F'Loop_Entry (K * 16 + L)));
+
+         --  ...and are therefore still reduced
+         pragma Loop_Invariant (for all K in I32 range 0 .. J =>
+                                  (for all L in I32 range 8 .. 15 =>
+                                     F (K * 16 + L) in Mont_Range));
+
+         pragma Loop_Invariant (for all K in I32 range (J + 1) * 16 .. 255 => F (K) = F'Loop_Entry (K));
+      end loop;
+
+      --  When J = 15, all elements are now reduced.
+      pragma Assert (for all K in I32 range 0 .. 15 =>
+                        (for all L in I32 range 0 .. 15 =>
+                           F (K * 16 + L) in Mont_Range));
+
+      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
+
+   end Reduce_After_Layer5;
+
    --  ================
    --  Layer 5 Len=8
    --  ================
@@ -731,8 +796,10 @@ is
       Layer7 (F);
       Layer7_to_6_Lemma (F);
       Layer6 (F);
-
       Layer5 (F);
+
+      Reduce_After_Layer5 (F);
+
       Layer4 (F);
       Layer3 (F);
       Layer2 (F);
