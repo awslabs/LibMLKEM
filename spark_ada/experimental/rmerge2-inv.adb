@@ -306,74 +306,210 @@ is
                              ZI    : in     SU7;
                              Start : in     Index_256)
      with Global => null,
-          Pre    => Start <= 240 and then
-                    (for all K in Index_256 => F (K) in Mont_Range2),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre    => ZI in 16 .. 31 and then
+                    Start <= 240 and then
+                    Start mod 16 = 0 and then
+                    (F (Start)      in Mont_Range4 and
+                     F (Start + 1)  in Mont_Range4 and
+                     F (Start + 2)  in Mont_Range2 and
+                     F (Start + 3)  in Mont_Range2 and
+                     F (Start + 4)  in Mont_Range  and
+                     F (Start + 5)  in Mont_Range  and
+                     F (Start + 6)  in Mont_Range  and
+                     F (Start + 7)  in Mont_Range  and
+                     F (Start + 8)  in Mont_Range4 and
+                     F (Start + 9)  in Mont_Range4 and
+                     F (Start + 10) in Mont_Range2 and
+                     F (Start + 11) in Mont_Range2 and
+                     F (Start + 12) in Mont_Range  and
+                     F (Start + 13) in Mont_Range  and
+                     F (Start + 14) in Mont_Range  and
+                     F (Start + 15) in Mont_Range),
+          Post   => (for all K in Index_256 range 0 .. Start - 1 => F (K) = F'Old (K)) and
+                     F (Start)      in Mont_Range8 and
+                     F (Start + 1)  in Mont_Range8 and
+                     F (Start + 2)  in Mont_Range4 and
+                     F (Start + 3)  in Mont_Range4 and
+                     F (Start + 4)  in Mont_Range2 and
+                     F (Start + 5)  in Mont_Range2 and
+                     F (Start + 6)  in Mont_Range2 and
+                     F (Start + 7)  in Mont_Range2 and
+                     F (Start + 8)  in Mont_Range  and
+                     F (Start + 9)  in Mont_Range  and
+                     F (Start + 10) in Mont_Range  and
+                     F (Start + 11) in Mont_Range  and
+                     F (Start + 12) in Mont_Range  and
+                     F (Start + 13) in Mont_Range  and
+                     F (Start + 14) in Mont_Range  and
+                     F (Start + 15) in Mont_Range  and
+                    (for all K in Index_256 range Start + 16 .. 255 => F (K) = F'Old (K));
 
    procedure NTT_Inv_Inner5 (F     : in out Poly_Zq;
                              ZI    : in     SU7;
                              Start : in     Index_256)
    is
-      T : I16;
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
+      CI0  : constant Index_256 := Start;
+      CI1  : constant Index_256 := CI0 + 1;
+      CI2  : constant Index_256 := CI0 + 2;
+      CI3  : constant Index_256 := CI0 + 3;
+      CI4  : constant Index_256 := CI0 + 4;
+      CI5  : constant Index_256 := CI0 + 5;
+      CI6  : constant Index_256 := CI0 + 6;
+      CI7  : constant Index_256 := CI0 + 7;
+      CI8  : constant Index_256 := CI0 + 8;
+      CI9  : constant Index_256 := CI0 + 9;
+      CI10 : constant Index_256 := CI0 + 10;
+      CI11 : constant Index_256 := CI0 + 11;
+      CI12 : constant Index_256 := CI0 + 12;
+      CI13 : constant Index_256 := CI0 + 13;
+      CI14 : constant Index_256 := CI0 + 14;
+      CI15 : constant Index_256 := CI0 + 15;
+      C0  : constant I16 := F (CI0);
+      C1  : constant I16 := F (CI1);
+      C2  : constant I16 := F (CI2);
+      C3  : constant I16 := F (CI3);
+      C4  : constant I16 := F (CI4);
+      C5  : constant I16 := F (CI5);
+      C6  : constant I16 := F (CI6);
+      C7  : constant I16 := F (CI7);
+      C8  : constant I16 := F (CI8);
+      C9  : constant I16 := F (CI9);
+      C10 : constant I16 := F (CI10);
+      C11 : constant I16 := F (CI11);
+      C12 : constant I16 := F (CI12);
+      C13 : constant I16 := F (CI13);
+      C14 : constant I16 := F (CI14);
+      C15 : constant I16 := F (CI15);
    begin
-      for J in Index_256 range Start .. Start + 7 loop
-         T         := F (J);
-         F (J)     := Barrett_Reduce (F (J + 8) + T);
-         F (J + 8) := FQMul    (Zeta, F (J + 8) - T);
+      F (CI0) := C0 + C8; --  Defer reduction
+      F (CI8) := FQMul (Zeta, C8 - C0);
 
-         pragma Loop_Invariant
-            -- Elements 0 .. Start - 1 are unchanged
-           (for all I in Index_256 range 0 .. Start - 1 => F (I) = F'Loop_Entry (I));
-         pragma Loop_Invariant
-            -- Elements Start through J are updated and in BRange
-           (for all I in Index_256 range Start .. J => F (I) in BRange);
-         pragma Loop_Invariant
-            -- Elements J + 1 .. Start + 8 - 1 are unchanged
-           (for all I in Index_256 range J + 1 .. Start + 7 => F (I) = F'Loop_Entry (I));
-         pragma Loop_Invariant
-            --  Elements Start + 8 through J + 8 are updated and in Mont_Range
-           (for all I in Index_256 range Start + 8 .. J + 8 => (F (I) in Mont_Range));
-         pragma Loop_Invariant
-            --  Elements from J + 8 + 1 .. 255 are unchanged
-           (for all I in Index_256 range J + 9 .. 255 => F (I) = F'Loop_Entry (I));
+      F (CI1) := C1 + C9; --  Defer reduction
+      F (CI9) := FQMul (Zeta, C9 - C1);
 
-      end loop;
+      F (CI2) := C2 + C10; --  Defer reduction
+      F (CI10) := FQMul (Zeta, C10 - C2);
 
-      --  J = Start + 7
-      pragma Assert
-        (for all I in Index_256 range 0          .. Start - 1  => F (I) in Mont_Range2);
-      pragma Assert
-        (for all I in Index_256 range Start      .. Start + 7  => F (I) in BRange);
-      pragma Assert
-        (for all I in Index_256 range Start + 8  .. Start + 15 => (F (I) in Mont_Range));
-      pragma Assert
-        (for all I in Index_256 range Start + 16 .. 255        => F (I) in Mont_Range2);
+      F (CI3) := C3 + C11; --  Defer reduction
+      F (CI11) := FQMul (Zeta, C11 - C3);
 
-      --  Merge ranges of the middle two, and note that Mont_Range is wider than BRange
-      pragma Assert
-        (for all I in Index_256 range     0      .. Start - 1  => F (I) in Mont_Range2);
-      pragma Assert
-        (for all I in Index_256 range Start      .. Start + 15 => F (I) in Mont_Range);
-      pragma Assert
-        (for all I in Index_256 range Start + 16 .. 255        => F (I) in Mont_Range2);
+      F (CI4) := C4 + C12; --  Defer reduction
+      F (CI12) := FQMul (Zeta, C12 - C4);
 
-      pragma Assert
-        (for all I in Index_256  => F (I) in Mont_Range2);
+      F (CI5) := C5 + C13; --  Defer reduction
+      F (CI13) := FQMul (Zeta, C13 - C5);
+
+      F (CI6) := C6 + C14; --  Defer reduction
+      F (CI14) := FQMul (Zeta, C14 - C6);
+
+      F (CI7) := C7 + C15; --  Defer reduction
+      F (CI15) := FQMul (Zeta, C15 - C7);
    end NTT_Inv_Inner5;
 
    procedure Layer5 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range2),
-          Post => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre  => (for all K in I32 range 0 .. 15 =>
+                     F (K * 16)      in Mont_Range4 and
+                     F (K * 16 + 1)  in Mont_Range4 and
+                     F (K * 16 + 2)  in Mont_Range2 and
+                     F (K * 16 + 3)  in Mont_Range2 and
+                     F (K * 16 + 4)  in Mont_Range  and
+                     F (K * 16 + 5)  in Mont_Range  and
+                     F (K * 16 + 6)  in Mont_Range  and
+                     F (K * 16 + 7)  in Mont_Range  and
+                     F (K * 16 + 8)  in Mont_Range4 and
+                     F (K * 16 + 9)  in Mont_Range4 and
+                     F (K * 16 + 10) in Mont_Range2 and
+                     F (K * 16 + 11) in Mont_Range2 and
+                     F (K * 16 + 12) in Mont_Range  and
+                     F (K * 16 + 13) in Mont_Range  and
+                     F (K * 16 + 14) in Mont_Range  and
+                     F (K * 16 + 15) in Mont_Range),
+          Post => (for all K in I32 range 0 .. 15 =>
+                     F (K * 16)      in Mont_Range8 and
+                     F (K * 16 + 1)  in Mont_Range8 and
+                     F (K * 16 + 2)  in Mont_Range4 and
+                     F (K * 16 + 3)  in Mont_Range4 and
+                     F (K * 16 + 4)  in Mont_Range2 and
+                     F (K * 16 + 5)  in Mont_Range2 and
+                     F (K * 16 + 6)  in Mont_Range2 and
+                     F (K * 16 + 7)  in Mont_Range2 and
+                     F (K * 16 + 8)  in Mont_Range  and
+                     F (K * 16 + 9)  in Mont_Range  and
+                     F (K * 16 + 10) in Mont_Range  and
+                     F (K * 16 + 11) in Mont_Range  and
+                     F (K * 16 + 12) in Mont_Range  and
+                     F (K * 16 + 13) in Mont_Range  and
+                     F (K * 16 + 14) in Mont_Range  and
+                     F (K * 16 + 15) in Mont_Range);
 
    procedure Layer5 (F : in out Poly_Zq)
    is
    begin
       for J in I32 range 0 .. 15 loop
          NTT_Inv_Inner5 (F, 31 - J, J * 16);
-         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range2);
+
+         --  Elements modified so far increase in magnitude as follows:
+         pragma Loop_Invariant (for all K in I32 range 0 .. J =>
+                                  F (K * 16)      in Mont_Range8 and
+                                  F (K * 16 + 1)  in Mont_Range8 and
+                                  F (K * 16 + 2)  in Mont_Range4 and
+                                  F (K * 16 + 3)  in Mont_Range4 and
+                                  F (K * 16 + 4)  in Mont_Range2 and
+                                  F (K * 16 + 5)  in Mont_Range2 and
+                                  F (K * 16 + 6)  in Mont_Range2 and
+                                  F (K * 16 + 7)  in Mont_Range2 and
+                                  F (K * 16 + 8)  in Mont_Range  and
+                                  F (K * 16 + 9)  in Mont_Range  and
+                                  F (K * 16 + 10) in Mont_Range  and
+                                  F (K * 16 + 11) in Mont_Range  and
+                                  F (K * 16 + 12) in Mont_Range  and
+                                  F (K * 16 + 13) in Mont_Range  and
+                                  F (K * 16 + 14) in Mont_Range  and
+                                  F (K * 16 + 15) in Mont_Range);
+
+         --  Unmodified element retain their initial values...
+         pragma Loop_Invariant (for all K in I32 range (J + 1) * 16 .. 255 => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in I32 range J + 1 .. 15 =>
+                                  F (K * 16)      = F'Loop_Entry (K * 16)      and
+                                  F (K * 16 + 1)  = F'Loop_Entry (K * 16 + 1)  and
+                                  F (K * 16 + 2)  = F'Loop_Entry (K * 16 + 2)  and
+                                  F (K * 16 + 3)  = F'Loop_Entry (K * 16 + 3)  and
+                                  F (K * 16 + 4)  = F'Loop_Entry (K * 16 + 4)  and
+                                  F (K * 16 + 5)  = F'Loop_Entry (K * 16 + 5)  and
+                                  F (K * 16 + 6)  = F'Loop_Entry (K * 16 + 6)  and
+                                  F (K * 16 + 7)  = F'Loop_Entry (K * 16 + 7)  and
+                                  F (K * 16 + 8)  = F'Loop_Entry (K * 16 + 8)  and
+                                  F (K * 16 + 9)  = F'Loop_Entry (K * 16 + 9)  and
+                                  F (K * 16 + 10) = F'Loop_Entry (K * 16 + 10) and
+                                  F (K * 16 + 11) = F'Loop_Entry (K * 16 + 11) and
+                                  F (K * 16 + 12) = F'Loop_Entry (K * 16 + 12) and
+                                  F (K * 16 + 13) = F'Loop_Entry (K * 16 + 13) and
+                                  F (K * 16 + 14) = F'Loop_Entry (K * 16 + 14) and
+                                  F (K * 16 + 15) = F'Loop_Entry (K * 16 + 15));
+
+         --  ...and therefore retain the ranges specified in the pre-condition. This is
+         --  sufficient to meet the pre-condition of the _next_ call to NTT_Inv_Inner6
+         pragma Loop_Invariant (for all K in I32 range J + 1 .. 15 =>
+                                  F (K * 16)      in Mont_Range4 and
+                                  F (K * 16 + 1)  in Mont_Range4 and
+                                  F (K * 16 + 2)  in Mont_Range2 and
+                                  F (K * 16 + 3)  in Mont_Range2 and
+                                  F (K * 16 + 4)  in Mont_Range  and
+                                  F (K * 16 + 5)  in Mont_Range  and
+                                  F (K * 16 + 6)  in Mont_Range  and
+                                  F (K * 16 + 7)  in Mont_Range  and
+                                  F (K * 16 + 8)  in Mont_Range4 and
+                                  F (K * 16 + 9)  in Mont_Range4 and
+                                  F (K * 16 + 10) in Mont_Range2 and
+                                  F (K * 16 + 11) in Mont_Range2 and
+                                  F (K * 16 + 12) in Mont_Range  and
+                                  F (K * 16 + 13) in Mont_Range  and
+                                  F (K * 16 + 14) in Mont_Range  and
+                                  F (K * 16 + 15) in Mont_Range);
+
       end loop;
    end Layer5;
 
