@@ -76,7 +76,7 @@ is
 
    procedure NTT_Inv_Inner1 (F     : in out Poly_Zq)
      with Global => null,
-          Pre    => (for all K in Index_256 => F (K) in Mont_Range8),
+          Pre    => (for all K in Index_256 => F (K) in Mont_Range4),
           Post   => (for all K in Index_256 => F (K) in Mont_Range8);
 
    procedure NTT_Inv_Inner1 (F     : in out Poly_Zq)
@@ -86,31 +86,15 @@ is
    begin
       for J in Index_256 range 0 .. 127 loop
          T           := F (J);
-         F (J)       := Barrett_Reduce (F (J + 128) + T);
+         F (J)       := F (J + 128) + T; --  Defer reduction
          F (J + 128) :=    FQMul (Zeta, F (J + 128) - T);
-
-         pragma Loop_Invariant
-            -- Elements Start through J are updated and in BRange
-           (for all I in Index_256 range 0 .. J => F (I) in BRange);
-         pragma Loop_Invariant
-            -- Elements J + 1 .. Start + 128 - 1 are unchanged
-           (for all I in Index_256 range J + 1 .. 127 => F (I) = F'Loop_Entry (I));
-         pragma Loop_Invariant
-            --  Elements Start + 128 through J + 128 are updated and in Mont_Range
-           (for all I in Index_256 range 128 .. J + 128 => (F (I) in Mont_Range));
-         pragma Loop_Invariant
-            --  Elements from J + 128 + 1 .. 255 are unchanged
-           (for all I in Index_256 range J + 129 .. 255 => F (I) = F'Loop_Entry (I));
-
       end loop;
-
-      --  (J = 127) => Postcondition
    end NTT_Inv_Inner1;
 
    procedure Layer1 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range8),
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range4),
           Post => (for all K in Index_256 => F (K) in Mont_Range8);
 
    procedure Layer1 (F : in out Poly_Zq)
@@ -119,6 +103,63 @@ is
       NTT_Inv_Inner1 (F);
    end Layer1;
 
+
+   --  ===================
+   --  Reduce_After_Layer2
+   --  ===================
+
+   procedure Reduce_After_Layer2 (F : in out Poly_Zq)
+     with No_Inline,
+          Global => null,
+          Pre    => (for all K in Index_256 range 0 .. 15 => F (K)       in Mont_Range8 and
+                                                             F  (16 + K) in Mont_Range4 and
+                                                             F  (32 + K) in Mont_Range2 and
+                                                             F  (48 + K) in Mont_Range2 and
+                                                             F  (64 + K) in Mont_Range  and
+                                                             F  (80 + K) in Mont_Range  and
+                                                             F  (96 + K) in Mont_Range  and
+                                                             F (112 + K) in Mont_Range  and
+                                                             F (128 + K) in Mont_Range8 and
+                                                             F (144 + K) in Mont_Range4 and
+                                                             F (160 + K) in Mont_Range2 and
+                                                             F (176 + K) in Mont_Range2 and
+                                                             F (192 + K) in Mont_Range  and
+                                                             F (208 + K) in Mont_Range  and
+                                                             F (224 + K) in Mont_Range  and
+                                                             F (240 + K) in Mont_Range),
+          Post   => (for all K in Index_256 range 0 .. 15 => F (K)       in Mont_Range  and
+                                                             F  (16 + K) in Mont_Range4 and
+                                                             F  (32 + K) in Mont_Range2 and
+                                                             F  (48 + K) in Mont_Range2 and
+                                                             F  (64 + K) in Mont_Range  and
+                                                             F  (80 + K) in Mont_Range  and
+                                                             F  (96 + K) in Mont_Range  and
+                                                             F (112 + K) in Mont_Range  and
+                                                             F (128 + K) in Mont_Range  and
+                                                             F (144 + K) in Mont_Range4 and
+                                                             F (160 + K) in Mont_Range2 and
+                                                             F (176 + K) in Mont_Range2 and
+                                                             F (192 + K) in Mont_Range  and
+                                                             F (208 + K) in Mont_Range  and
+                                                             F (224 + K) in Mont_Range  and
+                                                             F (240 + K) in Mont_Range);
+
+   procedure Reduce_After_Layer2 (F : in out Poly_Zq)
+   is
+   begin
+      for J in I32 range 0 .. 15 loop
+         F (J)       := Barrett_Reduce (F (J));
+         F (J + 128) := Barrett_Reduce (F (J + 128));
+         pragma Loop_Invariant (for all K in I32 range 0       .. J      => (F (K) in Mont_Range));
+         pragma Loop_Invariant (for all K in I32 range J + 1   .. 127     => (F (K) = F'Loop_Entry (K)));
+         pragma Loop_Invariant (for all K in I32 range 128     .. J + 128 => (F (K) in Mont_Range));
+         pragma Loop_Invariant (for all K in I32 range J + 129 .. 255     => (F (K) = F'Loop_Entry (K)));
+      end loop;
+
+      pragma Assert (for all K in I32 range 0   ..  15 => (F (K) in Mont_Range));
+      pragma Assert (for all K in I32 range 128 .. 143 => (F (K) in Mont_Range));
+
+   end Reduce_After_Layer2;
 
    --  ================
    --  Layer 2 Len=64
@@ -313,7 +354,7 @@ is
    begin
       NTT_Inv_Inner2 (F, 3, 0);
       NTT_Inv_Inner2 (F, 2, 128);
- end Layer2;
+   end Layer2;
 
    --  ================
    --  Layer 3 Len=32
@@ -1083,11 +1124,13 @@ is
       Reduce_After_Layer5 (F);
       Layer4 (F);
       Layer3 (F);
-
-
       Layer2 (F);
+
+      Reduce_After_Layer2 (F);
+
       Layer1 (F);
 
+      -- Move this up?
       for I in Index_256 loop
          F (I) := FQMul (1441, F (I));
          pragma Loop_Invariant (for all K in Index_256 range 0 .. I => F (K) in Mont_Range);
