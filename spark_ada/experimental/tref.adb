@@ -29,7 +29,9 @@ begin
    Put_Line ("P1:");
    PP (P1);
 
-   NTT  (P1);
+   for I in 0 .. 999 loop
+      NTT  (P1);
+   end loop;
 
    Put_Line ("NTT(P1):");
    PP (P1);
