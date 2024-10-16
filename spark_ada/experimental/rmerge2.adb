@@ -68,67 +68,18 @@ is
       return Mont_Range (T5);
    end Montgomery_Reduce;
 
+
    -- Barrett reduction
    function Barrett_Reduce (A : in Integer_16) return BRange
    is
-      --  int16_t t;
-      --  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
-      --
-      --  t  = ((int32_t)v*a + (1<<25)) >> 26;
-      --  t *= KYBER_Q;
-      --  return a - t;
-
-       C25 : constant := 2**25;
-       V   : constant := (C26 + (Q / 2)) / Q;
-       T   : Integer_32;
+       Magic : constant := (C26 + (Q / 2)) / Q;
+       T : Integer_32;
    begin
-       T := ASR32_26 ((V * Integer_32 (A)) + C25);
-       T := T * Q;
-       T := Integer_32 (A) - T;
-       return BRange (T);
+       --  T := round-to-nearest(A / Q) but using constant-time Montgomery
+       --  division, using C26 / Q as the magic multiplier
+       T := ASR32_26 ((Magic * Integer_32 (A)) + (C26 / 2));
+       return BRange (Integer_32 (A) - T * Q);
    end Barrett_Reduce;
-
-   function Barrett_Reduce_Slow (A : in Integer_16) return BRange
-   is
-      --  int16_t t;
-      --  const int16_t v = ((1<<26) + KYBER_Q/2)/KYBER_Q;
-      --
-      --  t  = ((int32_t)v*a + (1<<25)) >> 26;
-      --  t *= KYBER_Q;
-      --  return a - t;
-
-       C25 : constant := 2**25;
-       V   : constant := (C26 + (Q / 2)) / Q;
-       T   : Integer_32;
-       T2  : Integer_16;
-       R   : BRange;
-   begin
-       pragma Assert (V = 20159);
-
-       T := V * Integer_32 (A);
-
-       pragma Assert (T >= -660_570_112);
-       pragma Assert (T <=  660_549_953);
-
-       T := T + C25;
-
-       pragma Assert (T >= -627_015_680);
-       pragma Assert (T <=  694_104_385);
-
-       T := ASR32_26 (T);
-
-       pragma Assert (T >= -10);
-       pragma Assert (T <=  10);
-
-       T2 := To16 (T * Q);
-       T := Integer_32 (A) - Integer_32 (T2);
-       T2 := To16 (T);
-
-       R := BRange (T2);
-       pragma Annotate (GNATprove, False_Positive, "range check*", "OK");
-
-       return R;
-   end Barrett_Reduce_Slow;
 
 
    function FQMul (Z : in Zeta_Range; --  First parameter is always Zeta

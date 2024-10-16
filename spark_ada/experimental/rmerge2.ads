@@ -80,12 +80,6 @@ private
    subtype Mont_Range7 is I16 range -7 * QM1 .. 7 * QM1;
    subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
 
-
-   --  Slower but provable with SPARK
-   function Barrett_Reduce_Slow (A : in Integer_16) return BRange
-     with Global => null;
-
-   --  Faster, but not SPARK
    function Barrett_Reduce (A : in Integer_16) return BRange
      with Global => null,
           Inline_Always;
