@@ -147,6 +147,7 @@ is
    procedure Reduce_After_Layer2 (F : in out Poly_Zq)
    is
    begin
+      --  This does 32 calls to Barrett_Reduce
       for J in I32 range 0 .. 15 loop
          F (J)       := Barrett_Reduce (F (J));
          F (J + 128) := Barrett_Reduce (F (J + 128));
@@ -621,6 +622,7 @@ is
    procedure Reduce_After_Layer5 (F : in out Poly_Zq)
    is
    begin
+      --  This does 16 * 8 = 128 calls to Barrett_Reduce
       for J in I32 range 0 .. 15 loop
          F (J * 16)     := Barrett_Reduce (F (J * 16));
          F (J * 16 + 1) := Barrett_Reduce (F (J * 16 + 1));
@@ -1121,7 +1123,9 @@ is
       Layer6 (F);
       Layer6_to_5_Lemma (F);
       Layer5 (F);
+
       Reduce_After_Layer5 (F);
+
       Layer4 (F);
       Layer3 (F);
       Layer2 (F);
