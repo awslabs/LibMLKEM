@@ -1,6 +1,32 @@
 package body RMerge2.Inv
   with SPARK_Mode => On
 is
+   --============================================================
+   --  Part 1 - INTT as per FIPS-203 with Eager reduction
+   --  of coefficients
+   --============================================================
+
+   --  Multiply all coefficients by F = mont^2/128 = 1441, and
+   --  reduce so all coefficients in Mont_Range
+   procedure Invert_And_Reduce (F : in out Poly_Zq)
+     with Global => null,
+          No_Inline,
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range8),
+          Post => (for all K in Index_256 => F (K) in Mont_Range);
+
+   procedure Invert_And_Reduce (F : in out Poly_Zq)
+   is
+   begin
+      for I in Index_256 loop
+         F (I) := FQMul (1441, F (I));
+         pragma Loop_Invariant (for all K in Index_256 range 0     .. I   => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in Index_256 range I + 1 .. 255 => F (K) in Mont_Range8);
+      end loop;
+   end Invert_And_Reduce;
+
+
+   --  General purpose GS-Butterfly, as per FIPS-203 with EAGER
+   --  Reduction.
    procedure NTT_Inv_Inner (F     : in out Poly_Zq;
                             ZI    : in     SU7;
                             Start : in     Index_256;
@@ -11,8 +37,8 @@ is
                     Len <= 128 and then
                     Start <= 252 and then
                     Start + 2 * Len <= 256 and then
-                    (for all K in Index_256 => F (K) in Mont_Range2),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range2);
+                    (for all K in Index_256 => F (K) in Mont_Range),
+          Post   => (for all K in Index_256 => F (K) in Mont_Range);
 
    procedure NTT_Inv_Inner (F     : in out Poly_Zq;
                             ZI    : in     SU7;
@@ -23,9 +49,9 @@ is
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
    begin
       for J in Index_256 range Start .. Start + (Len - 1) loop
-         T := F (J);
-         F (J) := Barrett_Reduce (T + F (J + Len));
-         F (J + Len) := FQMul (Zeta, F (J + Len) - T);
+         T           := F (J);
+         F (J)       := Barrett_Reduce (T + F (J + Len)); --  Reduce
+         F (J + Len) := FQMul (Zeta, F (J + Len) - T); -- Reduce
 
          pragma Loop_Invariant
             -- Elements 0 .. Start - 1 are unchanged
@@ -33,6 +59,9 @@ is
          pragma Loop_Invariant
             -- Elements Start through J are updated and in BRange
            (for all I in Index_256 range Start .. J => F (I) in BRange);
+         pragma Loop_Invariant
+            -- Elements Start through J are updated and ALSO in Mont_Range
+           (for all I in Index_256 range Start .. J => F (I) in Mont_Range);
          pragma Loop_Invariant
             -- Elements J + 1 .. Start + Len - 1 are unchanged
            (for all I in Index_256 range J + 1 .. Start + Len - 1 => F (I) = F'Loop_Entry (I));
@@ -46,63 +75,134 @@ is
       end loop;
 
       --  (J = Start + Len - 1) => Postcondition
+      pragma Assert
+         -- Elements Start through J are updated and in Mont_Range
+        (for all I in Index_256 range Start .. Start + Len - 1 => F (I) in Mont_Range);
+      pragma Assert
+         --  Elements Start + Len through J + Len are updated and in Mont_Range
+        (for all I in Index_256 range Start + Len .. Start + Len - 1 + Len => (F (I) in Mont_Range));
+
+      --  All other elements preserve their initial values, so still in Mont_Range
+      --  as per the precondition, so...
+      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
+
    end NTT_Inv_Inner;
 
-      --  --  J = Start + Len - 1
-      --  pragma Assert
-      --    (for all I in Index_256 range 0 .. Start - 1 => F (I) in Mont_Range2);
-      --  pragma Assert
-      --    (for all I in Index_256 range Start .. Start + Len - 1 => F (I) in BRange);
-      --  pragma Assert
-      --    (for all I in Index_256 range Start + Len .. Start + Len - 1 + Len => (F (I) in Mont_Range));
-      --  pragma Assert
-      --    (for all I in Index_256 range Start + Len - 1 + Len + 1 .. 255 => F (I) in Mont_Range2);
 
-      --  --  Merge ranges of the middle two, and note that Mont_Range is wider than BRange
-      --  pragma Assert
-      --    (for all I in Index_256 range     0           .. Start - 1           => F (I) in Mont_Range2);
-      --  pragma Assert
-      --    (for all I in Index_256 range Start           .. Start + 2 * Len - 1 => F (I) in Mont_Range);
-      --  pragma Assert
-      --    (for all I in Index_256 range Start + 2 * Len .. 255                 => F (I) in Mont_Range2);
+   --  FIPS-203 Algorithm 10
+   procedure INTT (F : in out Poly_Zq)
+   is
+      subtype NTT_Len_Bit_Index is Natural range 0 .. 6;
+      subtype NTT_Len_Power     is Natural range 1 .. 7;
 
-      --  pragma Assert
-      --    (for all I in Index_256  => F (I) in Mont_Range2);
+      --  A power of 2 between 2 and 128. Used in NTT and NTT_Inv
+      subtype Len_T is Index_256
+         with Dynamic_Predicate =>
+            (for some I in NTT_Len_Power => Len_T = 2**I);
 
+      --  A power of 2 between 1 and 64. Used in NTT and NTT_Inv
+      subtype Count_T is Index_256
+         with Dynamic_Predicate =>
+            (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
+
+      K     : SU7;
+      Len   : Len_T;
+      Count : Count_T;
+   begin
+      K     := 127;
+
+      --  note "reverse" loop here for NTT_Inv
+      for I in reverse NTT_Len_Bit_Index loop
+         --  When I = 6, Len =   2, Count = 64
+         --       I = 5, Len =   4, Count = 32
+         --       I = 4, Len =   8, Count = 16
+         --       I = 3, Len =  16, Count = 8
+         --       I = 2, Len =  32, Count = 4
+         --       I = 1, Len =  64, Count = 2
+         --       I = 0, Len = 128, Count = 1
+         Len   := 2**(7 - I);
+         Count := 2**I;
+         for J in I32 range 0 .. Count - 1 loop
+            pragma Loop_Invariant (Count * Len = 128);
+            pragma Loop_Invariant (J * 2 * Len <= 252);
+            pragma Loop_Invariant (I32 (K) = 2**I + Count - J - 1);
+            pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+
+            NTT_Inv_Inner (F     => F,
+                           ZI    => K,
+                           Start => J * 2 * Len,
+                           Len   => Len);
+            K := K - 1;
+         end loop;
+
+         --  When the inner loop terminates, K has been
+         --  decremented Count times, therefore
+         --  K = 2**I + Count - Count - 1, which simplifies to
+         pragma Loop_Invariant (I32 (K) = 2**I - 1);
+         pragma Loop_Invariant (Count * Len = 128);
+         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+      end loop;
+
+      --  Substitute I = 0 into the outer loop invariant to get
+      pragma Assert (K = 0);
+      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
+
+      Invert_And_Reduce (F);
+   end INTT;
+
+
+   --============================================================
+   --  Part 2 - INTT optimized with exact tracking of
+   --  coefficient ranges for each layer, and deferred reduction
+   --============================================================
 
    --  ================
    --  Layer 1 Len=128
    --  ================
 
-   procedure NTT_Inv_Inner1 (F     : in out Poly_Zq)
+   procedure Layer1 (F     : in out Poly_Zq)
      with Global => null,
           Pre    => (for all K in Index_256 => F (K) in Mont_Range4),
           Post   => (for all K in Index_256 => F (K) in Mont_Range8);
 
-   procedure NTT_Inv_Inner1 (F     : in out Poly_Zq)
+   procedure Layer1 (F     : in out Poly_Zq)
    is
       T : I16;
       Zeta : constant Zeta_Range := Zeta_ExpC (1);
    begin
       for J in Index_256 range 0 .. 127 loop
-         T           := F (J);
-         F (J)       := F (J + 128) + T; --  Defer reduction
-         F (J + 128) :=    FQMul (Zeta, F (J + 128) - T);
+         declare
+            CI0   : constant Index_256 := J;
+            CI128 : constant Index_256 := CI0 + 128;
+            C0    : constant I16 := F (CI0);
+            C128  : constant I16 := F (CI128);
+         begin
+            T         := C0;
+            F (CI0)   := C128 + T; --  Defer reduction
+            F (CI128) := FQMul (Zeta, C128 - T);
+         end;
+
+         --  Modified, increased to Mont_Range8
+         pragma Loop_Invariant (for all K in Index_256 range 0 .. J  => F (K) in Mont_Range8);
+
+         --  Not modified, but about to be
+         pragma Loop_Invariant (for all K in Index_256 range J + 1  .. 127 => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in Index_256 range J + 1  .. 127 => F (K) in Mont_Range4);
+
+         --  Modified, increased to Mont_Range8
+         pragma Loop_Invariant (for all K in Index_256 range 128 .. J + 128  => F (K) in Mont_Range8);
+
+         --  Not modified, but about to be
+         pragma Loop_Invariant (for all K in Index_256 range J + 129 .. 255 => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in Index_256 range J + 129 .. 255 => F (K) in Mont_Range4);
+
       end loop;
-   end NTT_Inv_Inner1;
 
-   procedure Layer1 (F : in out Poly_Zq)
-     with Global => null,
-          No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range4),
-          Post => (for all K in Index_256 => F (K) in Mont_Range8);
+      --  J = 127, substitute and simplify yields the postcondition
+      pragma Assert (for all K in Index_256 range   0 .. 127  => F (K) in Mont_Range8);
+      pragma Assert (for all K in Index_256 range 128 .. 255  => F (K) in Mont_Range8);
 
-   procedure Layer1 (F : in out Poly_Zq)
-   is
-   begin
-      NTT_Inv_Inner1 (F);
    end Layer1;
-
 
    --  ===================
    --  Reduce_After_Layer2
@@ -152,8 +252,10 @@ is
          F (J)       := Barrett_Reduce (F (J));
          F (J + 128) := Barrett_Reduce (F (J + 128));
          pragma Loop_Invariant (for all K in I32 range 0       .. J      => (F (K) in Mont_Range));
+         pragma Loop_Invariant (for all K in I32 range 0       .. J      => (F (K) in Mont_Range4));
          pragma Loop_Invariant (for all K in I32 range J + 1   .. 127     => (F (K) = F'Loop_Entry (K)));
          pragma Loop_Invariant (for all K in I32 range 128     .. J + 128 => (F (K) in Mont_Range));
+         pragma Loop_Invariant (for all K in I32 range 128     .. J + 128 => (F (K) in Mont_Range4));
          pragma Loop_Invariant (for all K in I32 range J + 129 .. 255     => (F (K) = F'Loop_Entry (K)));
       end loop;
 
@@ -1114,9 +1216,30 @@ is
                           F (K * 16 + 14) in Mont_Range  and
                           F (K * 16 + 15) in Mont_Range);
 
+      procedure Layer2_to_1_Lemma (F : in Poly_Zq)
+        with Ghost,
+             Global => null,
+             Pre   => (for all K in Index_256 range 0 .. 15 => F (K)       in Mont_Range  and
+                                                               F  (16 + K) in Mont_Range4 and
+                                                               F  (32 + K) in Mont_Range2 and
+                                                               F  (48 + K) in Mont_Range2 and
+                                                               F  (64 + K) in Mont_Range  and
+                                                               F  (80 + K) in Mont_Range  and
+                                                               F  (96 + K) in Mont_Range  and
+                                                               F (112 + K) in Mont_Range  and
+                                                               F (128 + K) in Mont_Range  and
+                                                               F (144 + K) in Mont_Range4 and
+                                                               F (160 + K) in Mont_Range2 and
+                                                               F (176 + K) in Mont_Range2 and
+                                                               F (192 + K) in Mont_Range  and
+                                                               F (208 + K) in Mont_Range  and
+                                                               F (224 + K) in Mont_Range  and
+                                                               F (240 + K) in Mont_Range),
+             Post  => (for all K in Index_256 => F (K) in Mont_Range4);
+
       procedure Layer7_to_6_Lemma (F : in Poly_Zq) is null;
       procedure Layer6_to_5_Lemma (F : in Poly_Zq) is null;
-
+      procedure Layer2_to_1_Lemma (F : in Poly_Zq) is null;
    begin
       Layer7 (F);
       Layer7_to_6_Lemma (F);
@@ -1132,74 +1255,11 @@ is
 
       Reduce_After_Layer2 (F);
 
+      Layer2_to_1_Lemma (F);
       Layer1 (F);
 
-      -- Move this up?
-      for I in Index_256 loop
-         F (I) := FQMul (1441, F (I));
-         pragma Loop_Invariant (for all K in Index_256 range 0 .. I => F (K) in Mont_Range);
-      end loop;
-
+      Invert_And_Reduce (F);
    end INTTnew;
 
-   procedure INTT (F : in out Poly_Zq)
-   is
-      subtype NTT_Len_Bit_Index is Natural range 0 .. 6;
-      subtype NTT_Len_Power     is Natural range 1 .. 7;
-
-      --  A power of 2 between 2 and 128. Used in NTT and NTT_Inv
-      subtype Len_T is Index_256
-         with Dynamic_Predicate =>
-            (for some I in NTT_Len_Power => Len_T = 2**I);
-
-      --  A power of 2 between 1 and 64. Used in NTT and NTT_Inv
-      subtype Count_T is Index_256
-         with Dynamic_Predicate =>
-            (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
-
-      K     : SU7;
-      Len   : Len_T;
-      Count : Count_T;
-   begin
-      K     := 127;
-
-      --  note "reverse" loop here for NTT_Inv
-      for I in reverse NTT_Len_Bit_Index loop
-         --  When I = 6, Len =   2, Count = 64
-         --       I = 5, Len =   4, Count = 32
-         --       I = 4, Len =   8, Count = 16
-         --       I = 3, Len =  16, Count = 8
-         --       I = 2, Len =  32, Count = 4
-         --       I = 1, Len =  64, Count = 2
-         --       I = 0, Len = 128, Count = 1
-         Len   := 2**(7 - I);
-         Count := 2**I;
-         for J in I32 range 0 .. Count - 1 loop
-            pragma Loop_Invariant (Count * Len = 128);
-            pragma Loop_Invariant (J * 2 * Len <= 252);
-            pragma Loop_Invariant (I32 (K) = 2**I + Count - J - 1);
-
-            NTT_Inv_Inner (F     => F,
-                           ZI    => K,
-                           Start => J * 2 * Len,
-                           Len   => Len);
-            K := K - 1;
-         end loop;
-
-         --  When the inner loop terminates, K has been
-         --  decremented Count times, therefore
-         --  K = 2**I + Count - Count - 1, which simplifies to
-         pragma Loop_Invariant (I32 (K) = 2**I - 1);
-      end loop;
-
-      --  Substitute I = 0 into the outer loop invariant to get
-      pragma Assert (K = 0);
-
-      for I in Index_256 loop
-         F (I) := FQMul (1441, F (I));
-         pragma Loop_Invariant (for all K in Index_256 range 0 .. I => F (K) in Mont_Range);
-      end loop;
-
-   end INTT;
 
 end RMerge2.Inv;
