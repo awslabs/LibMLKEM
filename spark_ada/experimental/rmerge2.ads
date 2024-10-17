@@ -6,10 +6,10 @@ is
 
    Q      : constant := 3329;
    QM1    : constant := Q - 1; --  Q Minus 1
-   QINV   : constant := -3327;
    Half_Q : constant := 1664;
 
    subtype Byte is Unsigned_8;
+   subtype U16  is Unsigned_16;
    subtype I16  is Integer_16;
    subtype I32  is Integer_32;
    subtype N32  is I32 range 0 .. I32'Last;

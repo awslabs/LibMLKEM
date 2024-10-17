@@ -1,7 +1,9 @@
+with Ada.Unchecked_Conversion;
 package body RMerge2
   with SPARK_Mode => On
 is
    C26 : constant := 2**26;
+   C16 : constant := 2**16;
 
    function Shift_Right_Arithmetic (Value  : I32;
                                     Amount : Natural) return I32
@@ -17,6 +19,12 @@ is
    is (Shift_Right_Arithmetic (X, 26))
      with Post => (if X >= 0 then ASR32_26'Result = X / C26 else
                                   ASR32_26'Result = ((X + 1) / C26) - 1);
+
+   --  As above, but for X >> 16
+   function ASR32_16 (X : in I32) return I32
+   is (Shift_Right_Arithmetic (X, 16))
+     with Post => (if X >= 0 then ASR32_16'Result = X / C16 else
+                                  ASR32_16'Result = ((X + 1) / C16) - 1);
 
    ------------------------
    --  Montgomery reduction
@@ -49,14 +57,15 @@ is
    end To16;
 
 
-   function Montgomery_Reduce (X : in Mont_Domain) return Mont_Range
+   function Montgomery_Reduce_Old (X : in Mont_Domain) return Mont_Range
      with Global => null,
           Inline_Always;
 
-   function Montgomery_Reduce (X : in Mont_Domain) return Mont_Range
+   function Montgomery_Reduce_Old (X : in Mont_Domain) return Mont_Range
      with SPARK_Mode => Off
    is
       pragma Suppress (All_Checks);
+      QINV : constant := -3327; -- 62209
       T1, T3, T4, T5 : I32;
       T2             : I16;
    begin
@@ -66,6 +75,73 @@ is
       T4 := X - T3 * Q;
       T5 := Shift_Right_Arithmetic (T4, 16);
       return Mont_Range (T5);
+   end Montgomery_Reduce_Old;
+
+   function Montgomery_Reduce (X : in Mont_Domain) return Mont_Range
+     with Global => null,
+          Inline_Always;
+
+   function Montgomery_Reduce (X : in Mont_Domain) return Mont_Range
+   is
+      --  Unchecked conversion from U16 to I16, but axiomitized here
+      --  for proof.
+      function Conv (A : in U16) return I16
+        with Inline_Always,
+             Global         => null,
+             Contract_Cases =>
+               ((A in     0 .. 32767) => Conv'Result = I16 (A),
+                (A in 32768 .. 65535) => Conv'Result = I16 (I32 (A) - 65536));
+
+      function Conv (A : in U16) return I16
+        with SPARK_Mode => Off
+      is
+         function C is new Ada.Unchecked_Conversion (U16, I16);
+      begin
+         return C (A);
+      end Conv;
+
+      QINV : constant U16 := 62209;
+
+      pragma Assert (if U16 (X mod C16) * QINV in 0 .. 32767 then X - (I32 (U16 (X mod C16) * QINV) * Q) >= -65516 * Q);
+
+      X_Reduced  : constant U16 := U16 (X mod C16);
+      pragma Assert (X_Reduced in U16);
+
+      pragma Assert (if X_Reduced * QINV in 0 .. 32767 then X - (I32 (X_Reduced * QINV) * Q) >= -65516 * Q);
+
+      X_Inverted : constant U16 := X_Reduced * QINV;
+      pragma Assert (X_Inverted in U16);
+
+      T : constant I16 := Conv (X_Inverted);
+      pragma Assert (T in I16);
+
+      pragma Assert (if X_Inverted in     0 .. 32767 then X - (I32 (X_Inverted) * Q) >= -65516 * Q);
+      pragma Assert (if X_Inverted in 32768 .. 65535 then X - ((I32 (X_Inverted) - 65536) * Q) >= -65516 * Q);
+      pragma Assert (X - (I32 (T) * Q) >= -65516 * Q);
+
+      R1 : constant I32 := I32 (T) * Q;
+
+      pragma Assert (R1 in I32 (I16'First) * Q .. I32 (I16'Last) * Q);
+
+      pragma Assert (X - R1 >= -65516 * Q);
+
+      R2 : constant I32 := X - R1;
+
+      pragma Assert (R2 >= -65516 * Q);
+      pragma Assert (R2 <=  65535 * Q);
+
+      R3 : constant I32 := ASR32_16 (R2);
+
+      pragma Assert (if R2 >= 0 then R3 = R2 / C16);
+      pragma Assert (if R2 >= 0 then R3 in 0 .. QM1);
+      pragma Assert (if R2 >= 0 then I16 (R3) in Mont_Range);
+
+      pragma Assert (if R2 <  0 then (R3 = (((R2 + 1) / C16) - 1)));
+      pragma Assert (if R2 <  0 then R3 in -QM1 .. -1);
+      pragma Assert (if R2 <  0 then I16 (R3) in Mont_Range);
+
+   begin
+      return Mont_Range (R3);
    end Montgomery_Reduce;
 
 
