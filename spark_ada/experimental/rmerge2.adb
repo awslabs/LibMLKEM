@@ -166,7 +166,7 @@ is
       pragma Assert (I32 (Z) * I32 (B) >= Mont_Domain'First);
       pragma Assert (I32 (Z) * I32 (B) <= Mont_Domain'Last);
       D := I32 (Z) * I32 (B);
-      return Montgomery_Reduce (D);
+      return Montgomery_Reduce_Old (D);
    end FQMul;
 
 
