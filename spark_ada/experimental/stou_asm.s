@@ -1,12 +1,15 @@
 	.arch armv8.4-a
-LFE3:
+
+#include "common.i"
+
 	.align	2
 	.p2align 5,,15
 	.globl _stou__c
+	.globl stou__c
 _stou__c:
-LFB5:
-	adrp	x2, lC0@PAGE
-	ldr	q31, [x2, #lC0@PAGEOFF]
+stou__c:
+	ASM_LOAD(x2, lC0)
+	ldr	q31, [x2]
 	mov	x2, 0
 	.p2align 5,,15
 
@@ -34,10 +37,11 @@ L5:
 
 	.align	4
 	.globl _stou__c2
+	.globl stou__c2
 _stou__c2:
-LFB6:
-	adrp	x2, lC0@PAGE
-	ldr	q31, [x2, #lC0@PAGEOFF]
+stou__c2:
+        ASM_LOAD(x2,lC0)
+	ldr	q31, [x2]
 	mov	x2, 0
 	.p2align 5,,15
 
@@ -77,10 +81,11 @@ L6:
 
 	.align	4
 	.globl _stou__c4
+	.globl stou__c4
 _stou__c4:
-LFB7:
-	adrp	x2, lC0@PAGE
-	ldr	q31, [x2, #lC0@PAGEOFF]
+stou__c4:
+	ASM_LOAD(x2,lC0)
+	ldr	q31, [x2]
 	mov	x2, 0
 	.p2align 5,,15
 
@@ -142,10 +147,12 @@ L7:
 
 	.align	4
 	.globl _stou__c4o
+	.globl stou__c4o
 _stou__c4o:
+stou__c4o:
 LFB8:
-	adrp	x2, lC0@PAGE
-	ldr	q31, [x2, #lC0@PAGEOFF]
+	ASM_LOAD(x2,lC0)
+	ldr	q31, [x2]
 	mov	x2, 0
 	.p2align 5,,15
 
