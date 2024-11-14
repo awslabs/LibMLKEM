@@ -1616,7 +1616,7 @@ is
    function MultiplyNTTs (F, G : in NTT_Poly_Zq) return NTT_Poly_Zq
      with No_Inline
    is
-      H : NTT_Poly_Zq := (others => 0); --  calls _memset()
+      H : NTT_Poly_Zq with Relaxed_Initialization;
    begin
       for I in Index_128 loop
          declare
@@ -1630,6 +1630,8 @@ is
             H (2 * I)     := (A0 * B0) + (A1 * B1G);
             H (2 * I + 1) := (A0 * B1) + (A1 * B0);
          end;
+         pragma Loop_Invariant
+           (for all K in Index_256 range 0 .. I * 2 + 1 => H (K)'Initialized);
       end loop;
       return H;
    end MultiplyNTTs;
@@ -1640,14 +1642,24 @@ is
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq_Vector
      with No_Inline
    is
-      R : NTT_Poly_Zq_Vector := (others => Null_NTT_Poly_Zq); --  calls _memset()
+      R : NTT_Poly_Zq_Vector with Relaxed_Initialization;
    begin
       for I in K_Range loop
-         for J in K_Range loop
-            R (I) := R (I) + MultiplyNTTs (Left (I) (J), Right (J)); --  calls _memcpy()
+         --  Unroll the first iteration of the inner loop to avoid
+         --  need to pre-initialize R with all 0 values
+         R (I) := MultiplyNTTs (Left (I) (0), Right (0));
+
+         pragma Loop_Invariant (for all P in K_Range range 0 .. I => R (P)'Initialized);
+
+         for J in K_Range range 1 .. K_Range'Last loop
+
+            pragma Loop_Invariant (for all P in K_Range range 0 .. I => R (P)'Initialized);
+
+            R (I) := R (I) + MultiplyNTTs (Left (I) (J), Right (J));
          end loop;
       end loop;
-      return R; --  calls _memcpy()
+
+      return R;
    end "*";
 
    --  Dot product of K-length vectors of NTT_Poly_Zq.
@@ -1656,12 +1668,15 @@ is
                  Right : in NTT_Poly_Zq_Vector) return NTT_Poly_Zq
      with No_Inline
    is
-      R : NTT_Poly_Zq := Null_NTT_Poly_Zq; --  calls _memset()
+      R : NTT_Poly_Zq;
    begin
-      for J in K_Range loop
-         R := R + MultiplyNTTs (Left (J), Right (J)); --  calls _memcpy()
+      --  Unroll the first iteration of the loop to avoid
+      --  need to pre-initialize R with all 0 values
+      R := MultiplyNTTs (Left (0), Right (0));
+      for J in K_Range range 1 .. K_Range'Last loop
+         R := R + MultiplyNTTs (Left (J), Right (J));
       end loop;
-      return R; --  calls _memcpy()
+      return R;
    end "*";
 
 
