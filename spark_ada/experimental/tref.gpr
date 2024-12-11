@@ -10,12 +10,12 @@ is
          "-gnatwaJ",
          "-gnaty-s",
 
---         "-gnata", -- All assertions and contracts ON
---         "-O1",
---         "-g",
+         "-gnata", -- All assertions and contracts ON
+         "-O1",
+         "-g",
 
-         "-gnatp", -- Suppress all runtime checks
-         "-O3",
+--         "-gnatp", -- Suppress all runtime checks
+--         "-O3",
 
          "-ffunction-sections", -- Create a linker section for each function
          "-fdata-sections");    -- Create a linker section for each data
@@ -32,7 +32,7 @@ is
                                       "--prover=z3,cvc5,altergo",
                                       "--timeout=10",
                                       "--memlimit=0",
-                                      "--steps=100000",
+                                      "--steps=500000",
                                       "--report=statistics");
    end Prove;
 

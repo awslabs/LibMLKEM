@@ -25,6 +25,13 @@ is
    subtype Poly_Zq is UPoly (Index_256);
 
    subtype Mont_Range is I16 range -QM1 .. QM1;
+   subtype Mont_Range2 is I16 range -2 * QM1 .. 2 * QM1;
+   subtype Mont_Range3 is I16 range -3 * QM1 .. 3 * QM1;
+   subtype Mont_Range4 is I16 range -4 * QM1 .. 4 * QM1;
+   subtype Mont_Range5 is I16 range -5 * QM1 .. 5 * QM1;
+   subtype Mont_Range6 is I16 range -6 * QM1 .. 6 * QM1;
+   subtype Mont_Range7 is I16 range -7 * QM1 .. 7 * QM1;
+   subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
 
    subtype BRange is Integer_16 range -Half_Q .. Half_Q;
 
@@ -71,14 +78,6 @@ private
      -1185, -1530, -1278,   794, -1510,  -854,  -870,   478,
       -108,  -308,   996,   991,   958, -1460,  1522,  1628);
 
-
-   subtype Mont_Range2 is I16 range -2 * QM1 .. 2 * QM1;
-   subtype Mont_Range3 is I16 range -3 * QM1 .. 3 * QM1;
-   subtype Mont_Range4 is I16 range -4 * QM1 .. 4 * QM1;
-   subtype Mont_Range5 is I16 range -5 * QM1 .. 5 * QM1;
-   subtype Mont_Range6 is I16 range -6 * QM1 .. 6 * QM1;
-   subtype Mont_Range7 is I16 range -7 * QM1 .. 7 * QM1;
-   subtype Mont_Range8 is I16 range -8 * QM1 .. 8 * QM1;
 
    function Barrett_Reduce (A : in Integer_16) return BRange
      with Global => null,

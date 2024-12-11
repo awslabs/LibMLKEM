@@ -89,7 +89,7 @@ is
    end NTT_Inv_Inner;
 
 
-   --  FIPS-203 Algorithm 10
+   --  FIPS-203 Algorithm 10, but inverting and reducing BEFORE butterflies
    procedure INTT (F : in out Poly_Zq)
    is
       subtype NTT_Len_Bit_Index is Natural range 0 .. 6;
@@ -109,6 +109,8 @@ is
       Len   : Len_T;
       Count : Count_T;
    begin
+      Invert_And_Reduce (F);
+
       K     := 127;
 
       --  note "reverse" loop here for NTT_Inv
@@ -147,7 +149,6 @@ is
       pragma Assert (K = 0);
       pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
 
-      Invert_And_Reduce (F);
    end INTT;
 
 
@@ -203,6 +204,20 @@ is
       pragma Assert (for all K in Index_256 range 128 .. 255  => F (K) in Mont_Range8);
 
    end Layer1;
+
+   procedure Reduce_All (F : in out Poly_Zq)
+     with Global => null,
+          No_Inline,
+          Pre  => (for all K in Index_256 => F (K) in I16),
+          Post => (for all K in Index_256 => F (K) in Mont_Range);
+
+   procedure Reduce_All (F : in out Poly_Zq)
+   is
+   begin
+      for I in F'Range loop
+         F (I) := Barrett_Reduce (F (I));
+      end loop;
+   end Reduce_All;
 
    --  ===================
    --  Reduce_After_Layer2
@@ -624,11 +639,13 @@ is
           Pre    => Start <= 224 and then
                     Start mod 32 = 0 and then
                     ZI in 8 .. 15 and then
-                    (for all K in Index_256 range 0 .. 31 => F (Start + K) in Mont_Range),
-          Post   => ((for all K in Index_256 range 0          .. Start - 1  => F (K) = F'Old (K)) and
-                     (for all K in Index_256 range Start      .. Start + 15 => F (K) in Mont_Range2) and
-                     (for all K in Index_256 range Start + 16 .. Start + 31 => F (K) in Mont_Range) and
-                     (for all K in Index_256 range Start + 32 .. 255        => F (K) = F'Old (K)));
+                    (for all K in Index_256 range 0 .. 31 => F (Start + K) in Mont_Range4),
+          Post => (for all K in Index_256 range 0 .. 31 => F (Start + K) in Mont_Range8);
+
+--          Post   => ((for all K in Index_256 range 0          .. Start - 1  => F (K) = F'Old (K)) and
+--                     (for all K in Index_256 range Start      .. Start + 15 => F (K) in Mont_Range2) and
+--                     (for all K in Index_256 range Start + 16 .. Start + 31 => F (K) in Mont_Range) and
+--                     (for all K in Index_256 range Start + 32 .. 255        => F (K) = F'Old (K)));
 
    procedure NTT_Inv_Inner4 (F     : in out Poly_Zq;
                              ZI    : in     SU7;
@@ -646,30 +663,30 @@ is
             F (CI0)  := C16 + C0; --  Defer reduction
             F (CI16) := FQMul (Zeta, C16 - C0);
          end;
-         --  Never changed
-         pragma Loop_Invariant (for all K in Index_256 range 0              .. Start - 1  => F (K) = F'Loop_Entry (K));
+         --  --  Never changed
+         --  pragma Loop_Invariant (for all K in Index_256 range 0              .. Start - 1  => F (K) = F'Loop_Entry (K));
 
-         --  Modified, increased
-         pragma Loop_Invariant (for all K in Index_256 range Start          .. Start + J  => F (K) in Mont_Range2);
+         --  --  Modified, increased
+         --  pragma Loop_Invariant (for all K in Index_256 range Start          .. Start + J  => F (K) in Mont_Range2);
 
-         --  Not modified, but about to be
-         pragma Loop_Invariant (for all K in Index_256 range Start + J + 1  .. Start + 15 => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start + J + 1  .. Start + 15 => F (K) in Mont_Range);
+         --  --  Not modified, but about to be
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + J + 1  .. Start + 15 => F (K) = F'Loop_Entry (K));
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + J + 1  .. Start + 15 => F (K) in Mont_Range);
 
-         --  Modified, but still in Mont_Range
-         pragma Loop_Invariant (for all K in Index_256 range Start + 16     .. Start + J + 16 => F (K) in Mont_Range);
+         --  --  Modified, but still in Mont_Range
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + 16     .. Start + J + 16 => F (K) in Mont_Range);
 
-         --  Not modified, but about to be
-         pragma Loop_Invariant (for all K in Index_256 range Start + J + 17 .. Start + 31     => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start + J + 17 .. Start + 31     => F (K) in Mont_Range);
+         --  --  Not modified, but about to be
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + J + 17 .. Start + 31     => F (K) = F'Loop_Entry (K));
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + J + 17 .. Start + 31     => F (K) in Mont_Range);
 
-         --  Never changed
-         pragma Loop_Invariant (for all K in Index_256 range Start + 32     .. 255        => F (K) = F'Loop_Entry (K));
+         --  --  Never changed
+         --  pragma Loop_Invariant (for all K in Index_256 range Start + 32     .. 255        => F (K) = F'Loop_Entry (K));
       end loop;
 
       --  J = 15, substitute and simplify...
-      pragma Assert (for all K in Index_256 range Start      .. Start + 15 => F (K) in Mont_Range2);
-      pragma Assert (for all K in Index_256 range Start + 16 .. Start + 31 => F (K) in Mont_Range);
+--      pragma Assert (for all K in Index_256 range Start      .. Start + 15 => F (K) in Mont_Range2);
+--      pragma Assert (for all K in Index_256 range Start + 16 .. Start + 31 => F (K) in Mont_Range);
    end NTT_Inv_Inner4;
 
    procedure Layer4 (F : in out Poly_Zq)
@@ -767,6 +784,7 @@ is
                              ZI    : in     SU7;
                              Start : in     Index_256)
      with Global => null,
+          Inline_Always,
           Pre    => ZI in 16 .. 31 and then
                     Start <= 240 and then
                     Start mod 16 = 0 and then
@@ -985,17 +1003,10 @@ is
           Pre    => ZI in 32 .. 63 and then
                     Start <= 248 and then
                     Start mod 8 = 0 and then
-                    (F (Start)     in Mont_Range2 and
-                     F (Start + 1) in Mont_Range2 and
-                     F (Start + 2) in Mont_Range and
-                     F (Start + 3) in Mont_Range and
-                     F (Start + 4) in Mont_Range2 and
-                     F (Start + 5) in Mont_Range2 and
-                     F (Start + 6) in Mont_Range and
-                     F (Start + 7) in Mont_Range),
+                    (for all K in Index_256 range Start .. Start + 7 => F (K) in Mont_Range),
           Post   => (for all K in Index_256 range 0 .. Start - 1 => F (K) = F'Old (K)) and
-                     F (Start)     in Mont_Range4 and
-                     F (Start + 1) in Mont_Range4 and
+                     F (Start)     in Mont_Range2 and
+                     F (Start + 1) in Mont_Range2 and
                      F (Start + 2) in Mont_Range2 and
                      F (Start + 3) in Mont_Range2 and
                      F (Start + 4) in Mont_Range and
@@ -1043,18 +1054,10 @@ is
    procedure Layer6 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in I32 range 0 .. 31 =>
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range),
+          Post => (for all K in I32 range 0 .. 31 =>
                      F (K * 8)     in Mont_Range2 and
                      F (K * 8 + 1) in Mont_Range2 and
-                     F (K * 8 + 2) in Mont_Range  and
-                     F (K * 8 + 3) in Mont_Range  and
-                     F (K * 8 + 4) in Mont_Range2 and
-                     F (K * 8 + 5) in Mont_Range2 and
-                     F (K * 8 + 6) in Mont_Range  and
-                     F (K * 8 + 7) in Mont_Range),
-          Post => (for all K in I32 range 0 .. 31 =>
-                     F (K * 8)     in Mont_Range4 and
-                     F (K * 8 + 1) in Mont_Range4 and
                      F (K * 8 + 2) in Mont_Range2 and
                      F (K * 8 + 3) in Mont_Range2 and
                      F (K * 8 + 4) in Mont_Range  and
@@ -1071,38 +1074,15 @@ is
 
          --  Elements modified so far increase in magnitude as follows:
          pragma Loop_Invariant (for all K in I32 range 0 .. J =>
-                                  F (K * 8)     in Mont_Range4 and
-                                  F (K * 8 + 1) in Mont_Range4 and
+                                  F (K * 8)     in Mont_Range2 and
+                                  F (K * 8 + 1) in Mont_Range2 and
                                   F (K * 8 + 2) in Mont_Range2 and
                                   F (K * 8 + 3) in Mont_Range2 and
                                   F (K * 8 + 4) in Mont_Range  and
                                   F (K * 8 + 5) in Mont_Range  and
                                   F (K * 8 + 6) in Mont_Range  and
                                   F (K * 8 + 7) in Mont_Range);
-
-         --  Unmodified element retain their initial values...
-         pragma Loop_Invariant (for all K in I32 range (J + 1) * 8 .. 255 => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
-                                  F (K * 8)     = F'Loop_Entry (K * 8)     and
-                                  F (K * 8 + 1) = F'Loop_Entry (K * 8 + 1) and
-                                  F (K * 8 + 2) = F'Loop_Entry (K * 8 + 2) and
-                                  F (K * 8 + 3) = F'Loop_Entry (K * 8 + 3) and
-                                  F (K * 8 + 4) = F'Loop_Entry (K * 8 + 4) and
-                                  F (K * 8 + 5) = F'Loop_Entry (K * 8 + 5) and
-                                  F (K * 8 + 6) = F'Loop_Entry (K * 8 + 6) and
-                                  F (K * 8 + 7) = F'Loop_Entry (K * 8 + 7));
-
-         --  ...and therefore retain the ranges specified in the pre-condition. This is
-         --  sufficient to meet the pre-condition of the _next_ call to NTT_Inv_Inner6
-         pragma Loop_Invariant (for all K in I32 range J + 1 .. 31 =>
-                                  F (K * 8)     in Mont_Range2 and
-                                  F (K * 8 + 1) in Mont_Range2 and
-                                  F (K * 8 + 2) in Mont_Range  and
-                                  F (K * 8 + 3) in Mont_Range  and
-                                  F (K * 8 + 4) in Mont_Range2 and
-                                  F (K * 8 + 5) in Mont_Range2 and
-                                  F (K * 8 + 6) in Mont_Range  and
-                                  F (K * 8 + 7) in Mont_Range);
+         pragma Loop_Invariant (for all K in I32 range J * 8 + 8 .. 255 => F (K) in Mont_Range);
       end loop;
    end Layer6;
 
@@ -1145,15 +1125,6 @@ is
 
 
    procedure Layer7 (F : in out Poly_Zq)
-     with Global => null,
-          No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range),
-          Post => ((for all K in I32 range 0 .. 63 => F (K * 4)     in Mont_Range2) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 1) in Mont_Range2) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 2) in Mont_Range) and
-                   (for all K in I32 range 0 .. 63 => F (K * 4 + 3) in Mont_Range));
-
-   procedure Layer7 (F : in out Poly_Zq)
    is
    begin
       for J in I32 range 0 .. 63 loop
@@ -1166,7 +1137,768 @@ is
       end loop;
    end Layer7;
 
-   --  Optimized implementation
+   --  ================
+   --  Layer 7
+   --  ================
+
+   procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
+                             ZI    : in     SU7;
+                             Start : in     Index_256)
+     with Global => null,
+          Pre  => ZI in 64 .. 127 and then
+                  Start <= 252 and then
+                  (for all I in Index_256 range Start .. Start + 3 => (F (I) in I16)),
+          Post => ((for all I in Index_256 range 0         .. Start - 1 => (F (I) = F'Old (I))) and
+                   (for all I in Index_256 range Start     .. Start + 3 => (F (I) in Mont_Range)) and
+                   (for all I in Index_256 range Start + 4 .. 255       => (F (I) = F'Old (I))));
+
+   procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
+                             ZI    : in     SU7;
+                             Start : in     Index_256)
+   is
+      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
+      CI0 : constant Index_256 := Start;
+      CI1 : constant Index_256 := CI0 + 1;
+      CI2 : constant Index_256 := CI0 + 2;
+      CI3 : constant Index_256 := CI0 + 3;
+
+      C0  : constant Mont_Range := FQMul (1441, F (CI0));
+      C1  : constant Mont_Range := FQMul (1441, F (CI1));
+      C2  : constant Mont_Range := FQMul (1441, F (CI2));
+      C3  : constant Mont_Range := FQMul (1441, F (CI3));
+   begin
+      F (CI0) := Barrett_Reduce (C0 + C2);
+      F (CI2) := FQMul (Zeta, (C2 - C0));
+
+      F (CI1) := Barrett_Reduce (C1 + C3);
+      F (CI3) := FQMul (Zeta, (C3 - C1));
+   end NTT_Inv_InvertInner7;
+
+
+   procedure InvertLayer7 (F : in out Poly_Zq)
+   is
+   begin
+      for J in I32 range 0 .. 63 loop
+         NTT_Inv_InvertInner7 (F, 127 - J, J * 4);
+         pragma Loop_Invariant (for all K in I32 range 0 .. (J * 4 + 3) => F (K) in Mont_Range);
+      end loop;
+   end InvertLayer7;
+
+
+   ----------------------
+
+   procedure Layer765 (F : in out Poly_Zq)
+     with Global => null,
+          No_Inline,
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range),
+          Post => (for all K in Index_256 => F (K) in Mont_Range);
+
+   procedure Layer765 (F : in out Poly_Zq)
+   is
+   begin
+      for J in I32 range 0 .. 15 loop
+         declare
+            L5_ZI : constant SU7 := 31 - J;
+            L5_Z  : constant Zeta_Range := Zeta_ExpC (L5_ZI);
+
+            L6_ZI1 : constant SU7 := L5_ZI * 2;
+            L6_ZI2 : constant SU7 := L5_ZI * 2 + 1;
+            L6_Z1  : constant Zeta_Range := Zeta_ExpC (L6_ZI1);
+            L6_Z2  : constant Zeta_Range := Zeta_ExpC (L6_ZI2);
+
+            L7_ZI1 : constant SU7 := L6_ZI1 * 2;
+            L7_ZI2 : constant SU7 := L6_ZI1 * 2 + 1;
+            L7_ZI3 : constant SU7 := L6_ZI2 * 2;
+            L7_ZI4 : constant SU7 := L6_ZI2 * 2 + 1;
+            L7_Z4  : constant Zeta_Range := Zeta_ExpC (L7_ZI4);
+            L7_Z3  : constant Zeta_Range := Zeta_ExpC (L7_ZI3);
+            L7_Z2  : constant Zeta_Range := Zeta_ExpC (L7_ZI2);
+            L7_Z1  : constant Zeta_Range := Zeta_ExpC (L7_ZI1);
+
+            CI0  : constant Index_256 := J * 16;
+            CI1  : constant Index_256 := CI0 + 1;
+            CI2  : constant Index_256 := CI0 + 2;
+            CI3  : constant Index_256 := CI0 + 3;
+            CI4  : constant Index_256 := CI0 + 4;
+            CI5  : constant Index_256 := CI0 + 5;
+            CI6  : constant Index_256 := CI0 + 6;
+            CI7  : constant Index_256 := CI0 + 7;
+            CI8  : constant Index_256 := CI0 + 8;
+            CI9  : constant Index_256 := CI0 + 9;
+            CI10 : constant Index_256 := CI0 + 10;
+            CI11 : constant Index_256 := CI0 + 11;
+            CI12 : constant Index_256 := CI0 + 12;
+            CI13 : constant Index_256 := CI0 + 13;
+            CI14 : constant Index_256 := CI0 + 14;
+            CI15 : constant Index_256 := CI0 + 15;
+         begin
+            declare
+               C0  : constant Mont_Range := F (CI0);
+               C1  : constant Mont_Range := F (CI1);
+               C2  : constant Mont_Range := F (CI2);
+               C3  : constant Mont_Range := F (CI3);
+               C4  : constant Mont_Range := F (CI4);
+               C5  : constant Mont_Range := F (CI5);
+               C6  : constant Mont_Range := F (CI6);
+               C7  : constant Mont_Range := F (CI7);
+               C8  : constant Mont_Range := F (CI8);
+               C9  : constant Mont_Range := F (CI9);
+               C10 : constant Mont_Range := F (CI10);
+               C11 : constant Mont_Range := F (CI11);
+               C12 : constant Mont_Range := F (CI12);
+               C13 : constant Mont_Range := F (CI13);
+               C14 : constant Mont_Range := F (CI14);
+               C15 : constant Mont_Range := F (CI15);
+            begin
+               -- NTT_Inv_Inner7 (F, L7_ZI4, J * 16);
+               F (CI0) := C0 + C2; --  Defer reduction,
+               F (CI2) := FQMul (L7_Z4, (C2 - C0));
+
+               F (CI1) := C1 + C3; --  Defer reduction
+               F (CI3) := FQMul (L7_Z4, (C3 - C1));
+
+               -- NTT_Inv_Inner7 (F, L7_ZI3, J * 16 + 4);
+               F (CI4) := C4 + C6; --  Defer reduction,
+               F (CI6) := FQMul (L7_Z3, (C6 - C4));
+
+               F (CI5) := C5 + C7; --  Defer reduction
+               F (CI7) := FQMul (L7_Z3, (C7 - C5));
+
+               -- NTT_Inv_Inner7 (F, L7_ZI2, J * 16 + 8);
+               F (CI8)  := C8 + C10; --  Defer reduction,
+               F (CI10) := FQMul (L7_Z2, (C10 - C8));
+
+               F (CI9)  := C9 + C11; --  Defer reduction
+               F (CI11) := FQMul (L7_Z2, (C11 - C9));
+
+               -- NTT_Inv_Inner7 (F, L7_ZI1, J * 16 + 12);
+               F (CI12) := C12 + C14; --  Defer reduction,
+               F (CI14) := FQMul (L7_Z1, (C14 - C12));
+
+               F (CI13) := C13 + C15; --  Defer reduction
+               F (CI15) := FQMul (L7_Z1, (C15 - C13));
+            end;
+
+            declare
+               C0  : constant Mont_Range2 := F (CI0);
+               C1  : constant Mont_Range2 := F (CI1);
+               C2  : constant Mont_Range  := F (CI2);
+               C3  : constant Mont_Range  := F (CI3);
+               C4  : constant Mont_Range2 := F (CI4);
+               C5  : constant Mont_Range2 := F (CI5);
+               C6  : constant Mont_Range  := F (CI6);
+               C7  : constant Mont_Range  := F (CI7);
+               C8  : constant Mont_Range2 := F (CI8);
+               C9  : constant Mont_Range2 := F (CI9);
+               C10 : constant Mont_Range  := F (CI10);
+               C11 : constant Mont_Range  := F (CI11);
+               C12 : constant Mont_Range2 := F (CI12);
+               C13 : constant Mont_Range2 := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+            begin
+               -- NTT_Inv_Inner6 (F, L6_ZI2, J * 16);
+               F (CI0) := C0 + C4; --  Defer reduction
+               F (CI4) := FQMul (L6_Z2, C4 - C0);
+
+               F (CI1) := C1 + C5; --  Defer reduction
+               F (CI5) := FQMul (L6_Z2, C5 - C1);
+
+               F (CI2) := C2 + C6; --  Defer reduction
+               F (CI6) := FQMul (L6_Z2, C6 - C2);
+
+               F (CI3) := C3 + C7; --  Defer reduction
+               F (CI7) := FQMul (L6_Z2, C7 - C3);
+
+               -- NTT_Inv_Inner6 (F, L6_ZI1, J * 16 + 8);
+               F (CI8) := C8 + C12; --  Defer reduction
+               F (CI12) := FQMul (L6_Z1, C12 - C8);
+
+               F (CI9)  := C9 + C13; --  Defer reduction
+               F (CI13) := FQMul (L6_Z1, C13 - C9);
+
+               F (CI10) := C10 + C14; --  Defer reduction
+               F (CI14) := FQMul (L6_Z1, C14 - C10);
+
+               F (CI11) := C11 + C15; --  Defer reduction
+               F (CI15) := FQMul (L6_Z1, C15 - C11);
+            end;
+
+            -- NTT_Inv_Inner5 (F, L5_ZI, J * 16);
+            declare
+               C0  : constant Mont_Range4 := F (CI0);
+               C1  : constant Mont_Range4 := F (CI1);
+               C2  : constant Mont_Range2 := F (CI2);
+               C3  : constant Mont_Range2 := F (CI3);
+               C4  : constant Mont_Range  := F (CI4);
+               C5  : constant Mont_Range  := F (CI5);
+               C6  : constant Mont_Range  := F (CI6);
+               C7  : constant Mont_Range  := F (CI7);
+               C8  : constant Mont_Range4 := F (CI8);
+               C9  : constant Mont_Range4 := F (CI9);
+               C10 : constant Mont_Range2 := F (CI10);
+               C11 : constant Mont_Range2 := F (CI11);
+               C12 : constant Mont_Range  := F (CI12);
+               C13 : constant Mont_Range  := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+            begin
+               F (CI0) := Barrett_Reduce (C0 + C8);
+               F (CI8) := FQMul (L5_Z, C8 - C0);
+
+               F (CI1) := Barrett_Reduce (C1 + C9);
+               F (CI9) := FQMul (L5_Z, C9 - C1);
+
+               F (CI2) := Barrett_Reduce (C2 + C10);
+               F (CI10) := FQMul (L5_Z, C10 - C2);
+
+               F (CI3) := Barrett_Reduce (C3 + C11);
+               F (CI11) := FQMul (L5_Z, C11 - C3);
+
+               F (CI4) := Barrett_Reduce (C4 + C12);
+               F (CI12) := FQMul (L5_Z, C12 - C4);
+
+               F (CI5) := Barrett_Reduce (C5 + C13);
+               F (CI13) := FQMul (L5_Z, C13 - C5);
+
+               F (CI6) := Barrett_Reduce (C6 + C14);
+               F (CI14) := FQMul (L5_Z, C14 - C6);
+
+               F (CI7) := Barrett_Reduce (C7 + C15);
+               F (CI15) := FQMul (L5_Z, C15 - C7);
+            end;
+         end;
+         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+
+      end loop;
+
+  end Layer765;
+
+   ----------------------
+
+   procedure Layer654 (F : in out Poly_Zq)
+   is
+   begin
+      for J in I32 range 0 .. 7 loop
+         declare
+            Start  : constant Index_256 := J * 32;
+
+            L6ZI1   : constant SU7 := 63 - (J * 4);
+            L6Zeta1 : constant Zeta_Range := Zeta_ExpC (L6ZI1);
+            L6ZI2   : constant SU7 := 63 - (J * 4 + 1);
+            L6Zeta2 : constant Zeta_Range := Zeta_ExpC (L6ZI2);
+            L6ZI3   : constant SU7 := 63 - (J * 4 + 2);
+            L6Zeta3 : constant Zeta_Range := Zeta_ExpC (L6ZI3);
+            L6ZI4   : constant SU7 := 63 - (J * 4 + 3);
+            L6Zeta4 : constant Zeta_Range := Zeta_ExpC (L6ZI4);
+
+            L5ZI1   : constant SU7 := 31 - (J * 2);
+            L5Zeta1 : constant Zeta_Range := Zeta_ExpC (L5ZI1);
+            L5ZI2   : constant SU7 := 31 - (J * 2 + 1);
+            L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L5ZI2);
+
+            L4ZI   : constant SU7 := 15 - J;
+            L4Zeta : constant Zeta_Range := Zeta_ExpC (L4ZI);
+
+            CI0  : constant Index_256 := Start;
+            CI1  : constant Index_256 := Start + 1;
+            CI2  : constant Index_256 := Start + 2;
+            CI3  : constant Index_256 := Start + 3;
+            CI4  : constant Index_256 := Start + 4;
+            CI5  : constant Index_256 := Start + 5;
+            CI6  : constant Index_256 := Start + 6;
+            CI7  : constant Index_256 := Start + 7;
+            CI8  : constant Index_256 := Start + 8;
+            CI9  : constant Index_256 := Start + 9;
+            CI10 : constant Index_256 := Start + 10;
+            CI11 : constant Index_256 := Start + 11;
+            CI12 : constant Index_256 := Start + 12;
+            CI13 : constant Index_256 := Start + 13;
+            CI14 : constant Index_256 := Start + 14;
+            CI15 : constant Index_256 := Start + 15;
+            CI16 : constant Index_256 := Start + 16;
+            CI17 : constant Index_256 := Start + 17;
+            CI18 : constant Index_256 := Start + 18;
+            CI19 : constant Index_256 := Start + 19;
+            CI20 : constant Index_256 := Start + 20;
+            CI21 : constant Index_256 := Start + 21;
+            CI22 : constant Index_256 := Start + 22;
+            CI23 : constant Index_256 := Start + 23;
+            CI24 : constant Index_256 := Start + 24;
+            CI25 : constant Index_256 := Start + 25;
+            CI26 : constant Index_256 := Start + 26;
+            CI27 : constant Index_256 := Start + 27;
+            CI28 : constant Index_256 := Start + 28;
+            CI29 : constant Index_256 := Start + 29;
+            CI30 : constant Index_256 := Start + 30;
+            CI31 : constant Index_256 := Start + 31;
+         begin
+            --  NTT_Inv_Inner6 (F, L6ZI1, CI0);
+            --  NTT_Inv_Inner6 (F, L6ZI2, CI8);
+            --  NTT_Inv_Inner6 (F, L6ZI3, CI16);
+            --  NTT_Inv_Inner6 (F, L6ZI4, CI24);
+            declare
+               C0  : constant Mont_Range := F (CI0);
+               C1  : constant Mont_Range := F (CI1);
+               C2  : constant Mont_Range := F (CI2);
+               C3  : constant Mont_Range := F (CI3);
+               C4  : constant Mont_Range := F (CI4);
+               C5  : constant Mont_Range := F (CI5);
+               C6  : constant Mont_Range := F (CI6);
+               C7  : constant Mont_Range := F (CI7);
+               C8  : constant Mont_Range := F (CI8);
+               C9  : constant Mont_Range := F (CI9);
+               C10 : constant Mont_Range := F (CI10);
+               C11 : constant Mont_Range := F (CI11);
+               C12 : constant Mont_Range := F (CI12);
+               C13 : constant Mont_Range := F (CI13);
+               C14 : constant Mont_Range := F (CI14);
+               C15 : constant Mont_Range := F (CI15);
+               C16 : constant Mont_Range := F (CI16);
+               C17 : constant Mont_Range := F (CI17);
+               C18 : constant Mont_Range := F (CI18);
+               C19 : constant Mont_Range := F (CI19);
+               C20 : constant Mont_Range := F (CI20);
+               C21 : constant Mont_Range := F (CI21);
+               C22 : constant Mont_Range := F (CI22);
+               C23 : constant Mont_Range := F (CI23);
+               C24 : constant Mont_Range := F (CI24);
+               C25 : constant Mont_Range := F (CI25);
+               C26 : constant Mont_Range := F (CI26);
+               C27 : constant Mont_Range := F (CI27);
+               C28 : constant Mont_Range := F (CI28);
+               C29 : constant Mont_Range := F (CI29);
+               C30 : constant Mont_Range := F (CI30);
+               C31 : constant Mont_Range := F (CI31);
+            begin
+               F (CI0)  := C0 + C4;
+               F (CI4)  := FQMul (L6Zeta1, C4 - C0);
+               F (CI1)  := C1 + C5;
+               F (CI5)  := FQMul (L6Zeta1, C5 - C1);
+               F (CI2)  := C2 + C6;
+               F (CI6)  := FQMul (L6Zeta1, C6 - C2);
+               F (CI3)  := C3 + C7;
+               F (CI7)  := FQMul (L6Zeta1, C7 - C3);
+
+               F (CI8)  := C8 + C12;
+               F (CI12) := FQMul (L6Zeta2, C12 - C8);
+               F (CI9)  := C9 + C13;
+               F (CI13) := FQMul (L6Zeta2, C13 - C9);
+               F (CI10) := C10 + C14;
+               F (CI14) := FQMul (L6Zeta2, C14 - C10);
+               F (CI11) := C11 + C15;
+               F (CI15) := FQMul (L6Zeta2, C15 - C11);
+
+               F (CI16) := C16 + C20;
+               F (CI20) := FQMul (L6Zeta3, C20 - C16);
+               F (CI17) := C17 + C21;
+               F (CI21) := FQMul (L6Zeta3, C21 - C17);
+               F (CI18) := C18 + C22;
+               F (CI22) := FQMul (L6Zeta3, C22 - C18);
+               F (CI19) := C19 + C23;
+               F (CI23) := FQMul (L6Zeta3, C23 - C19);
+
+               F (CI24) := C24 + C28;
+               F (CI28) := FQMul (L6Zeta4, C28 - C24);
+               F (CI25) := C25 + C29;
+               F (CI29) := FQMul (L6Zeta4, C29 - C25);
+               F (CI26) := C26 + C30;
+               F (CI30) := FQMul (L6Zeta4, C30 - C26);
+               F (CI27) := C27 + C31;
+               F (CI31) := FQMul (L6Zeta4, C31 - C27);
+            end;
+
+            --  Layer 5
+            --  NTT_Inv_Inner5 (F, L5ZI1, CI0);
+            --  NTT_Inv_Inner5 (F, L5ZI2, CI16);
+            declare
+               C0  : constant Mont_Range2 := F (CI0);
+               C1  : constant Mont_Range2 := F (CI1);
+               C2  : constant Mont_Range2 := F (CI2);
+               C3  : constant Mont_Range2 := F (CI3);
+               C4  : constant Mont_Range  := F (CI4);
+               C5  : constant Mont_Range  := F (CI5);
+               C6  : constant Mont_Range  := F (CI6);
+               C7  : constant Mont_Range  := F (CI7);
+               C8  : constant Mont_Range2 := F (CI8);
+               C9  : constant Mont_Range2 := F (CI9);
+               C10 : constant Mont_Range2 := F (CI10);
+               C11 : constant Mont_Range2 := F (CI11);
+               C12 : constant Mont_Range  := F (CI12);
+               C13 : constant Mont_Range  := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+               C16 : constant Mont_Range2 := F (CI16);
+               C17 : constant Mont_Range2 := F (CI17);
+               C18 : constant Mont_Range2 := F (CI18);
+               C19 : constant Mont_Range2 := F (CI19);
+               C20 : constant Mont_Range  := F (CI20);
+               C21 : constant Mont_Range  := F (CI21);
+               C22 : constant Mont_Range  := F (CI22);
+               C23 : constant Mont_Range  := F (CI23);
+               C24 : constant Mont_Range2 := F (CI24);
+               C25 : constant Mont_Range2 := F (CI25);
+               C26 : constant Mont_Range2 := F (CI26);
+               C27 : constant Mont_Range2 := F (CI27);
+               C28 : constant Mont_Range  := F (CI28);
+               C29 : constant Mont_Range  := F (CI29);
+               C30 : constant Mont_Range  := F (CI30);
+               C31 : constant Mont_Range  := F (CI31);
+            begin
+               F (CI0) := C0 + C8;
+               F (CI8) := FQMul (L5Zeta1, C8 - C0);
+               F (CI1) := C1 + C9;
+               F (CI9) := FQMul (L5Zeta1, C9 - C1);
+               F (CI2) := C2 + C10;
+               F (CI10) := FQMul (L5Zeta1, C10 - C2);
+               F (CI3) := C3 + C11;
+               F (CI11) := FQMul (L5Zeta1, C11 - C3);
+               F (CI4) := C4 + C12;
+               F (CI12) := FQMul (L5Zeta1, C12 - C4);
+               F (CI5) := C5 + C13;
+               F (CI13) := FQMul (L5Zeta1, C13 - C5);
+               F (CI6) := C6 + C14;
+               F (CI14) := FQMul (L5Zeta1, C14 - C6);
+               F (CI7) := C7 + C15;
+               F (CI15) := FQMul (L5Zeta1, C15 - C7);
+               F (CI16) := C16 + C24;
+               F (CI24) := FQMul (L5Zeta2, C24 - C16);
+               F (CI17) := C17 + C25;
+               F (CI25) := FQMul (L5Zeta2, C25 - C17);
+               F (CI18) := C18 + C26;
+               F (CI26) := FQMul (L5Zeta2, C26 - C18);
+               F (CI19) := C19 + C27;
+               F (CI27) := FQMul (L5Zeta2, C27 - C19);
+               F (CI20) := C20 + C28;
+               F (CI28) := FQMul (L5Zeta2, C28 - C20);
+               F (CI21) := C21 + C29;
+               F (CI29) := FQMul (L5Zeta2, C29 - C21);
+               F (CI22) := C22 + C30;
+               F (CI30) := FQMul (L5Zeta2, C30 - C22);
+               F (CI23) := C23 + C31;
+               F (CI31) := FQMul (L5Zeta2, C31 - C23);
+            end;
+
+            --  Layer 4
+            declare
+               C0  : constant Mont_Range4 := F (CI0);
+               C1  : constant Mont_Range4 := F (CI1);
+               C2  : constant Mont_Range4 := F (CI2);
+               C3  : constant Mont_Range4 := F (CI3);
+               C4  : constant Mont_Range2 := F (CI4);
+               C5  : constant Mont_Range2 := F (CI5);
+               C6  : constant Mont_Range2 := F (CI6);
+               C7  : constant Mont_Range2 := F (CI7);
+               C8  : constant Mont_Range  := F (CI8);
+               C9  : constant Mont_Range  := F (CI9);
+               C10 : constant Mont_Range  := F (CI10);
+               C11 : constant Mont_Range  := F (CI11);
+               C12 : constant Mont_Range  := F (CI12);
+               C13 : constant Mont_Range  := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+               C16 : constant Mont_Range4 := F (CI16);
+               C17 : constant Mont_Range4 := F (CI17);
+               C18 : constant Mont_Range4 := F (CI18);
+               C19 : constant Mont_Range4 := F (CI19);
+               C20 : constant Mont_Range2 := F (CI20);
+               C21 : constant Mont_Range2 := F (CI21);
+               C22 : constant Mont_Range2 := F (CI22);
+               C23 : constant Mont_Range2 := F (CI23);
+               C24 : constant Mont_Range  := F (CI24);
+               C25 : constant Mont_Range  := F (CI25);
+               C26 : constant Mont_Range  := F (CI26);
+               C27 : constant Mont_Range  := F (CI27);
+               C28 : constant Mont_Range  := F (CI28);
+               C29 : constant Mont_Range  := F (CI29);
+               C30 : constant Mont_Range  := F (CI30);
+               C31 : constant Mont_Range  := F (CI31);
+            begin
+               F (CI0)  := Barrett_Reduce (C16 + C0);
+               F (CI16) := FQMul (L4Zeta, C16 - C0);
+               F (CI1)  := Barrett_Reduce (C17 + C1);
+               F (CI17) := FQMul (L4Zeta, C17 - C1);
+               F (CI2)  := Barrett_Reduce (C18 + C2);
+               F (CI18) := FQMul (L4Zeta, C18 - C2);
+               F (CI3)  := Barrett_Reduce (C19 + C3);
+               F (CI19) := FQMul (L4Zeta, C19 - C3);
+               F (CI4)  := Barrett_Reduce (C20 + C4);
+               F (CI20) := FQMul (L4Zeta, C20 - C4);
+               F (CI5)  := Barrett_Reduce (C21 + C5);
+               F (CI21) := FQMul (L4Zeta, C21 - C5);
+               F (CI6)  := Barrett_Reduce (C22 + C6);
+               F (CI22) := FQMul (L4Zeta, C22 - C6);
+               F (CI7)  := Barrett_Reduce (C23 + C7);
+               F (CI23) := FQMul (L4Zeta, C23 - C7);
+               F (CI8)  := Barrett_Reduce (C24 + C8);
+               F (CI24) := FQMul (L4Zeta, C24 - C8);
+               F (CI9)  := Barrett_Reduce (C25 + C9);
+               F (CI25) := FQMul (L4Zeta, C25 - C9);
+               F (CI10) := Barrett_Reduce (C26 + C10);
+               F (CI26) := FQMul (L4Zeta, C26 - C10);
+               F (CI11) := Barrett_Reduce (C27 + C11);
+               F (CI27) := FQMul (L4Zeta, C27 - C11);
+               F (CI12) := Barrett_Reduce (C28 + C12);
+               F (CI28) := FQMul (L4Zeta, C28 - C12);
+               F (CI13) := Barrett_Reduce (C29 + C13);
+               F (CI29) := FQMul (L4Zeta, C29 - C13);
+               F (CI14) := Barrett_Reduce (C30 + C14);
+               F (CI30) := FQMul (L4Zeta, C30 - C14);
+               F (CI15) := Barrett_Reduce (C31 + C15);
+               F (CI31) := FQMul (L4Zeta, C31 - C15);
+            end;
+         end;
+         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+      end loop;
+   end Layer654;
+
+   procedure Layer54a_Slice (F : in out Poly_Zq;
+                             L4ZI : in SU7;
+                             Start : in Index_256)
+   is
+      L5ZI1 : constant SU7 := L4ZI * 2;
+      L5ZI2 : constant SU7 := L5ZI1 + 1;
+   begin
+      NTT_Inv_Inner5 (F, L5ZI2, Start);
+      NTT_Inv_Inner5 (F, L5ZI1, Start + 16);
+      NTT_Inv_Inner4 (F, L4ZI,  Start);
+   end Layer54a_Slice;
+
+   procedure Layer54a (F : in out Poly_Zq)
+   is
+   begin
+      Layer54a_Slice (F, 15, 0);
+      Layer54a_Slice (F, 14, 32);
+      Layer54a_Slice (F, 13, 64);
+      Layer54a_Slice (F, 12, 96);
+      Layer54a_Slice (F, 11, 128);
+      Layer54a_Slice (F, 10, 160);
+      Layer54a_Slice (F,  9, 192);
+      Layer54a_Slice (F,  8, 224);
+   end Layer54a;
+
+   procedure Layer54 (F : in out Poly_Zq)   is
+   begin
+      for J in I32 range 0 .. 7 loop
+         declare
+            Start  : constant Index_256 := J * 32;
+
+            L6ZI1   : constant SU7 := 63 - (J * 4);
+            L6Zeta1 : constant Zeta_Range := Zeta_ExpC (L6ZI1);
+            L6ZI2   : constant SU7 := 63 - (J * 4 + 1);
+            L6Zeta2 : constant Zeta_Range := Zeta_ExpC (L6ZI2);
+            L6ZI3   : constant SU7 := 63 - (J * 4 + 2);
+            L6Zeta3 : constant Zeta_Range := Zeta_ExpC (L6ZI3);
+            L6ZI4   : constant SU7 := 63 - (J * 4 + 3);
+            L6Zeta4 : constant Zeta_Range := Zeta_ExpC (L6ZI4);
+
+            L5ZI1   : constant SU7 := 31 - (J * 2);
+            L5Zeta1 : constant Zeta_Range := Zeta_ExpC (L5ZI1);
+            L5ZI2   : constant SU7 := 31 - (J * 2 + 1);
+            L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L5ZI2);
+
+            L4ZI   : constant SU7 := 15 - J;
+            L4Zeta : constant Zeta_Range := Zeta_ExpC (L4ZI);
+
+            CI0  : constant Index_256 := Start;
+            CI1  : constant Index_256 := Start + 1;
+            CI2  : constant Index_256 := Start + 2;
+            CI3  : constant Index_256 := Start + 3;
+            CI4  : constant Index_256 := Start + 4;
+            CI5  : constant Index_256 := Start + 5;
+            CI6  : constant Index_256 := Start + 6;
+            CI7  : constant Index_256 := Start + 7;
+            CI8  : constant Index_256 := Start + 8;
+            CI9  : constant Index_256 := Start + 9;
+            CI10 : constant Index_256 := Start + 10;
+            CI11 : constant Index_256 := Start + 11;
+            CI12 : constant Index_256 := Start + 12;
+            CI13 : constant Index_256 := Start + 13;
+            CI14 : constant Index_256 := Start + 14;
+            CI15 : constant Index_256 := Start + 15;
+            CI16 : constant Index_256 := Start + 16;
+            CI17 : constant Index_256 := Start + 17;
+            CI18 : constant Index_256 := Start + 18;
+            CI19 : constant Index_256 := Start + 19;
+            CI20 : constant Index_256 := Start + 20;
+            CI21 : constant Index_256 := Start + 21;
+            CI22 : constant Index_256 := Start + 22;
+            CI23 : constant Index_256 := Start + 23;
+            CI24 : constant Index_256 := Start + 24;
+            CI25 : constant Index_256 := Start + 25;
+            CI26 : constant Index_256 := Start + 26;
+            CI27 : constant Index_256 := Start + 27;
+            CI28 : constant Index_256 := Start + 28;
+            CI29 : constant Index_256 := Start + 29;
+            CI30 : constant Index_256 := Start + 30;
+            CI31 : constant Index_256 := Start + 31;
+         begin
+            --  Layer 5
+            --  NTT_Inv_Inner5 (F, L5ZI1, CI0);
+            --  NTT_Inv_Inner5 (F, L5ZI2, CI16);
+            declare
+               C0  : constant Mont_Range2 := F (CI0);
+               C1  : constant Mont_Range2 := F (CI1);
+               C2  : constant Mont_Range2 := F (CI2);
+               C3  : constant Mont_Range2 := F (CI3);
+               C4  : constant Mont_Range  := F (CI4);
+               C5  : constant Mont_Range  := F (CI5);
+               C6  : constant Mont_Range  := F (CI6);
+               C7  : constant Mont_Range  := F (CI7);
+               C8  : constant Mont_Range2 := F (CI8);
+               C9  : constant Mont_Range2 := F (CI9);
+               C10 : constant Mont_Range2 := F (CI10);
+               C11 : constant Mont_Range2 := F (CI11);
+               C12 : constant Mont_Range  := F (CI12);
+               C13 : constant Mont_Range  := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+               C16 : constant Mont_Range2 := F (CI16);
+               C17 : constant Mont_Range2 := F (CI17);
+               C18 : constant Mont_Range2 := F (CI18);
+               C19 : constant Mont_Range2 := F (CI19);
+               C20 : constant Mont_Range  := F (CI20);
+               C21 : constant Mont_Range  := F (CI21);
+               C22 : constant Mont_Range  := F (CI22);
+               C23 : constant Mont_Range  := F (CI23);
+               C24 : constant Mont_Range2 := F (CI24);
+               C25 : constant Mont_Range2 := F (CI25);
+               C26 : constant Mont_Range2 := F (CI26);
+               C27 : constant Mont_Range2 := F (CI27);
+               C28 : constant Mont_Range  := F (CI28);
+               C29 : constant Mont_Range  := F (CI29);
+               C30 : constant Mont_Range  := F (CI30);
+               C31 : constant Mont_Range  := F (CI31);
+            begin
+               F (CI0) := C0 + C8;
+               F (CI8) := FQMul (L5Zeta1, C8 - C0);
+               F (CI1) := C1 + C9;
+               F (CI9) := FQMul (L5Zeta1, C9 - C1);
+               F (CI2) := C2 + C10;
+               F (CI10) := FQMul (L5Zeta1, C10 - C2);
+               F (CI3) := C3 + C11;
+               F (CI11) := FQMul (L5Zeta1, C11 - C3);
+               F (CI4) := C4 + C12;
+               F (CI12) := FQMul (L5Zeta1, C12 - C4);
+               F (CI5) := C5 + C13;
+               F (CI13) := FQMul (L5Zeta1, C13 - C5);
+               F (CI6) := C6 + C14;
+               F (CI14) := FQMul (L5Zeta1, C14 - C6);
+               F (CI7) := C7 + C15;
+               F (CI15) := FQMul (L5Zeta1, C15 - C7);
+               F (CI16) := C16 + C24;
+               F (CI24) := FQMul (L5Zeta2, C24 - C16);
+               F (CI17) := C17 + C25;
+               F (CI25) := FQMul (L5Zeta2, C25 - C17);
+               F (CI18) := C18 + C26;
+               F (CI26) := FQMul (L5Zeta2, C26 - C18);
+               F (CI19) := C19 + C27;
+               F (CI27) := FQMul (L5Zeta2, C27 - C19);
+               F (CI20) := C20 + C28;
+               F (CI28) := FQMul (L5Zeta2, C28 - C20);
+               F (CI21) := C21 + C29;
+               F (CI29) := FQMul (L5Zeta2, C29 - C21);
+               F (CI22) := C22 + C30;
+               F (CI30) := FQMul (L5Zeta2, C30 - C22);
+               F (CI23) := C23 + C31;
+               F (CI31) := FQMul (L5Zeta2, C31 - C23);
+            end;
+
+            --  Layer 4
+            declare
+               C0  : constant Mont_Range4 := F (CI0);
+               C1  : constant Mont_Range4 := F (CI1);
+               C2  : constant Mont_Range4 := F (CI2);
+               C3  : constant Mont_Range4 := F (CI3);
+               C4  : constant Mont_Range2 := F (CI4);
+               C5  : constant Mont_Range2 := F (CI5);
+               C6  : constant Mont_Range2 := F (CI6);
+               C7  : constant Mont_Range2 := F (CI7);
+               C8  : constant Mont_Range  := F (CI8);
+               C9  : constant Mont_Range  := F (CI9);
+               C10 : constant Mont_Range  := F (CI10);
+               C11 : constant Mont_Range  := F (CI11);
+               C12 : constant Mont_Range  := F (CI12);
+               C13 : constant Mont_Range  := F (CI13);
+               C14 : constant Mont_Range  := F (CI14);
+               C15 : constant Mont_Range  := F (CI15);
+               C16 : constant Mont_Range4 := F (CI16);
+               C17 : constant Mont_Range4 := F (CI17);
+               C18 : constant Mont_Range4 := F (CI18);
+               C19 : constant Mont_Range4 := F (CI19);
+               C20 : constant Mont_Range2 := F (CI20);
+               C21 : constant Mont_Range2 := F (CI21);
+               C22 : constant Mont_Range2 := F (CI22);
+               C23 : constant Mont_Range2 := F (CI23);
+               C24 : constant Mont_Range  := F (CI24);
+               C25 : constant Mont_Range  := F (CI25);
+               C26 : constant Mont_Range  := F (CI26);
+               C27 : constant Mont_Range  := F (CI27);
+               C28 : constant Mont_Range  := F (CI28);
+               C29 : constant Mont_Range  := F (CI29);
+               C30 : constant Mont_Range  := F (CI30);
+               C31 : constant Mont_Range  := F (CI31);
+            begin
+               F (CI0)  := (C16 + C0);
+               F (CI16) := FQMul (L4Zeta, C16 - C0);
+               F (CI1)  := (C17 + C1);
+               F (CI17) := FQMul (L4Zeta, C17 - C1);
+               F (CI2)  := (C18 + C2);
+               F (CI18) := FQMul (L4Zeta, C18 - C2);
+               F (CI3)  := (C19 + C3);
+               F (CI19) := FQMul (L4Zeta, C19 - C3);
+               F (CI4)  := (C20 + C4);
+               F (CI20) := FQMul (L4Zeta, C20 - C4);
+               F (CI5)  := (C21 + C5);
+               F (CI21) := FQMul (L4Zeta, C21 - C5);
+               F (CI6)  := (C22 + C6);
+               F (CI22) := FQMul (L4Zeta, C22 - C6);
+               F (CI7)  := (C23 + C7);
+               F (CI23) := FQMul (L4Zeta, C23 - C7);
+               F (CI8)  := (C24 + C8);
+               F (CI24) := FQMul (L4Zeta, C24 - C8);
+               F (CI9)  := (C25 + C9);
+               F (CI25) := FQMul (L4Zeta, C25 - C9);
+               F (CI10) := (C26 + C10);
+               F (CI26) := FQMul (L4Zeta, C26 - C10);
+               F (CI11) := (C27 + C11);
+               F (CI27) := FQMul (L4Zeta, C27 - C11);
+               F (CI12) := (C28 + C12);
+               F (CI28) := FQMul (L4Zeta, C28 - C12);
+               F (CI13) := (C29 + C13);
+               F (CI29) := FQMul (L4Zeta, C29 - C13);
+               F (CI14) := (C30 + C14);
+               F (CI30) := FQMul (L4Zeta, C30 - C14);
+               F (CI15) := (C31 + C15);
+               F (CI31) := FQMul (L4Zeta, C31 - C15);
+            end;
+         end;
+         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+      end loop;
+   end Layer54;
+
+
+
+   procedure Layer321 (F : in out Poly_Zq)
+     with Global => null,
+          No_Inline,
+          Pre  => (for all K in Index_256 => F (K) in Mont_Range8),
+          Post => (for all K in Index_256 => F (K) in Mont_Range);
+
+   procedure Layer321 (F : in out Poly_Zq)
+   is
+   begin
+      Reduce_All (F);
+      Layer3 (F);
+      Reduce_All (F);
+      Layer2 (F);
+      Reduce_All (F);
+      Layer1 (F);
+      Reduce_All (F);
+   end Layer321;
+
+
+   --  Optimized implementation, one layer at a time
    procedure INTTnew (F : in out Poly_Zq)
    is
       pragma Annotate (GNATprove, Intentional, "postcondition might fail", "Quantifier merging");
@@ -1241,25 +1973,23 @@ is
       procedure Layer6_to_5_Lemma (F : in Poly_Zq) is null;
       procedure Layer2_to_1_Lemma (F : in Poly_Zq) is null;
    begin
-      Layer7 (F);
-      Layer7_to_6_Lemma (F);
+      InvertLayer7 (F);
       Layer6 (F);
-      Layer6_to_5_Lemma (F);
-      Layer5 (F);
+      Layer54a (F);
+      Layer321(F);
+   end INTTnew;
 
-      Reduce_After_Layer5 (F);
-
+   --  Optimized implementation, with layer merging
+   procedure INTTmerge (F : in out Poly_Zq)
+   is
+   begin
+      Invert_And_Reduce (F);
+      Layer765 (F);
       Layer4 (F);
       Layer3 (F);
       Layer2 (F);
-
       Reduce_After_Layer2 (F);
-
-      Layer2_to_1_Lemma (F);
       Layer1 (F);
-
-      Invert_And_Reduce (F);
-   end INTTnew;
-
+   end INTTmerge;
 
 end RMerge2.Inv;
