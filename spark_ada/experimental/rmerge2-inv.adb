@@ -752,62 +752,24 @@ is
                              Start : in     Index_256)
    is
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
-      CI0  : constant Index_256 := Start;
-      CI1  : constant Index_256 := CI0 + 1;
-      CI2  : constant Index_256 := CI0 + 2;
-      CI3  : constant Index_256 := CI0 + 3;
-      CI4  : constant Index_256 := CI0 + 4;
-      CI5  : constant Index_256 := CI0 + 5;
-      CI6  : constant Index_256 := CI0 + 6;
-      CI7  : constant Index_256 := CI0 + 7;
-      CI8  : constant Index_256 := CI0 + 8;
-      CI9  : constant Index_256 := CI0 + 9;
-      CI10 : constant Index_256 := CI0 + 10;
-      CI11 : constant Index_256 := CI0 + 11;
-      CI12 : constant Index_256 := CI0 + 12;
-      CI13 : constant Index_256 := CI0 + 13;
-      CI14 : constant Index_256 := CI0 + 14;
-      CI15 : constant Index_256 := CI0 + 15;
-      C0  : constant I16 := F (CI0);
-      C1  : constant I16 := F (CI1);
-      C2  : constant I16 := F (CI2);
-      C3  : constant I16 := F (CI3);
-      C4  : constant I16 := F (CI4);
-      C5  : constant I16 := F (CI5);
-      C6  : constant I16 := F (CI6);
-      C7  : constant I16 := F (CI7);
-      C8  : constant I16 := F (CI8);
-      C9  : constant I16 := F (CI9);
-      C10 : constant I16 := F (CI10);
-      C11 : constant I16 := F (CI11);
-      C12 : constant I16 := F (CI12);
-      C13 : constant I16 := F (CI13);
-      C14 : constant I16 := F (CI14);
-      C15 : constant I16 := F (CI15);
    begin
-      F (CI0) := C0 + C8; --  Defer reduction
-      F (CI8) := FQMul (Zeta, C8 - C0);
-
-      F (CI1) := C1 + C9; --  Defer reduction
-      F (CI9) := FQMul (Zeta, C9 - C1);
-
-      F (CI2) := C2 + C10; --  Defer reduction
-      F (CI10) := FQMul (Zeta, C10 - C2);
-
-      F (CI3) := C3 + C11; --  Defer reduction
-      F (CI11) := FQMul (Zeta, C11 - C3);
-
-      F (CI4) := C4 + C12; --  Defer reduction
-      F (CI12) := FQMul (Zeta, C12 - C4);
-
-      F (CI5) := C5 + C13; --  Defer reduction
-      F (CI13) := FQMul (Zeta, C13 - C5);
-
-      F (CI6) := C6 + C14; --  Defer reduction
-      F (CI14) := FQMul (Zeta, C14 - C6);
-
-      F (CI7) := C7 + C15; --  Defer reduction
-      F (CI15) := FQMul (Zeta, C15 - C7);
+      for I in Index_256 range 0 .. 7 loop
+         declare
+            CI0 : constant Index_256 := Start + I;
+            CI8 : constant Index_256 := CI0 + 8;
+            C0  : constant I16 := F (CI0);
+            C8  : constant I16 := F (CI8);
+         begin
+            F (CI0) := C0 + C8;
+            F (CI8) := FQMul (Zeta, C8 - C0);
+         end;
+         pragma Loop_Invariant (for all K in Index_256 range 0             .. Start - 1     => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in Index_256 range Start         .. Start + I     => F (K) in Mont_Range4);
+         pragma Loop_Invariant (for all K in Index_256 range Start + I + 1 .. Start + 7     => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in Index_256 range Start + 8     .. Start + 8 + I => F (K) in Mont_Range4);
+         pragma Loop_Invariant (for all K in Index_256 range Start + I + 9 .. Start + 15    => F (K) = F'Loop_Entry (K));
+         pragma Loop_Invariant (for all K in Index_256 range Start + 16    .. 255           => F (K) = F'Loop_Entry (K));
+      end loop;
    end NTT_Inv_Inner5;
 
    procedure Layer54_Slice (F     : in out Poly_Zq;
