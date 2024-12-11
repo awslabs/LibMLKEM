@@ -813,13 +813,19 @@ is
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
                             Start : in     Index_256)
-     with Pre  => L4ZI in 8 .. 15 and then
+     with Global => null,
+          No_Inline,
+          Pre  => L4ZI in 8 .. 15 and then
                   Start <= 224 and then
                   Start mod 32 = 0 and then
                   (for all I in Index_256 range 0     .. Start - 1  => F (I) in Mont_Range8) and then
                   (for all I in Index_256 range Start .. 255        => F (I) in Mont_Range2),
           Post => (for all I in Index_256 range 0          .. Start + 31 => F (I) in Mont_Range8) and
-                  (for all I in Index_256 range Start + 32 .. 255        => F (I) in Mont_Range2)
+                  (for all I in Index_256 range Start + 32 .. 255        => F (I) in Mont_Range2);
+
+   procedure Layer54_Slice (F     : in out Poly_Zq;
+                            L4ZI  : in     SU7;
+                            Start : in     Index_256)
    is
       L5ZI1 : constant SU7 := L4ZI * 2;
       L5ZI2 : constant SU7 := L5ZI1 + 1;
@@ -830,7 +836,9 @@ is
    end Layer54_Slice;
 
    procedure Layer54 (F : in out Poly_Zq)
-     with Pre  => (for all I in Index_256 => F (I) in Mont_Range2),
+     with Global => null,
+          No_Inline,
+          Pre  => (for all I in Index_256 => F (I) in Mont_Range2),
           Post => (for all I in Index_256 => F (I) in Mont_Range8);
 
    procedure Layer54 (F : in out Poly_Zq)
