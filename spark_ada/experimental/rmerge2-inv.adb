@@ -1,6 +1,9 @@
 package body RMerge2.Inv
   with SPARK_Mode => On
 is
+   --  Shorthand to shorten line length of invariants
+   subtype I256 is Index_256;
+
    --============================================================
    --  Part 1 - INTT as per FIPS-203 with Eager reduction
    --  of coefficients
@@ -695,83 +698,6 @@ is
    --  Layer 54
    --  ================
 
-   procedure NTT_Inv_Inner4 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
-     with Global => null,
-          Inline_Always,
-          Pre    => Start <= 224 and then
-                    Start mod 32 = 0 and then
-                    ZI in 8 .. 15 and then
-                    (for all K in Index_256 range Start      .. Start + 31 => F (K) in Mont_Range4) and then
-                    (for all K in Index_256 range Start + 32 .. 255        => F (K) in Mont_Range4),
-          Post   => (for all K in Index_256 range 0 .. Start - 1 => F (K) = F'Old (K)) and
-                    (for all K in Index_256 range Start .. Start + 31 => F (K) in Mont_Range8) and
-                    (for all K in Index_256 range Start + 32 .. 255 => F (K) = F'Old (K));
-
-   procedure NTT_Inv_Inner4 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
-   is
-      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
-   begin
-      for J in Index_256 range 0 .. 15 loop
-         declare
-            CI0  : constant Index_256 := Start + J;
-            CI16 : constant Index_256 := Start + J + 16;
-            C0   : constant I16 := F (CI0);
-            C16  : constant I16 := F (CI16);
-         begin
-            F (CI0)  := C16 + C0; --  Defer reduction
-            F (CI16) := FQMul (Zeta, C16 - C0);
-         end;
-         pragma Loop_Invariant (for all K in Index_256 range 0                  .. Start - 1      => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start              .. Start + J      => F (K) in Mont_Range8);
-         pragma Loop_Invariant (for all K in Index_256 range Start + J + 1      .. Start + 15     => F (K) in Mont_Range4);
-         pragma Loop_Invariant (for all K in Index_256 range Start + 16         .. Start + 16 + J => F (K) in Mont_Range8);
-         pragma Loop_Invariant (for all K in Index_256 range Start + 16 + J + 1 .. Start + 31     => F (K) in Mont_Range4);
-         pragma Loop_Invariant (for all K in Index_256 range Start + 32         .. 255            => F (K) = F'Loop_Entry (K));
-      end loop;
-   end NTT_Inv_Inner4;
-
-   procedure NTT_Inv_Inner5 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
-     with Global => null,
-          Inline_Always,
-          Pre    => ZI in 16 .. 31 and then
-                    Start <= 240 and then
-                    Start mod 16 = 0 and then
-                    (for all K in Index_256 range Start .. Start + 15 => F (K) in Mont_Range2),
-          Post   => (for all K in Index_256 range 0 .. Start - 1 => F (K) = F'Old (K)) and
-                    (for all K in Index_256 range Start .. Start + 15 => F (K) in Mont_Range4) and
-                    (for all K in Index_256 range Start + 16 .. 255 => F (K) = F'Old (K));
-
-   procedure NTT_Inv_Inner5 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
-   is
-      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
-   begin
-      for I in Index_256 range 0 .. 7 loop
-         declare
-            CI0 : constant Index_256 := Start + I;
-            CI8 : constant Index_256 := CI0 + 8;
-            C0  : constant I16 := F (CI0);
-            C8  : constant I16 := F (CI8);
-         begin
-            F (CI0) := C0 + C8;
-            F (CI8) := FQMul (Zeta, C8 - C0);
-         end;
-         pragma Loop_Invariant (for all K in Index_256 range 0             .. Start - 1     => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start         .. Start + I     => F (K) in Mont_Range4);
-         pragma Loop_Invariant (for all K in Index_256 range Start + I + 1 .. Start + 7     => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start + 8     .. Start + 8 + I => F (K) in Mont_Range4);
-         pragma Loop_Invariant (for all K in Index_256 range Start + I + 9 .. Start + 15    => F (K) = F'Loop_Entry (K));
-         pragma Loop_Invariant (for all K in Index_256 range Start + 16    .. 255           => F (K) = F'Loop_Entry (K));
-      end loop;
-   end NTT_Inv_Inner5;
-
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
                             Start : in     Index_256)
@@ -789,12 +715,55 @@ is
                             L4ZI  : in     SU7;
                             Start : in     Index_256)
    is
-      L5ZI1 : constant SU7 := L4ZI * 2;
-      L5ZI2 : constant SU7 := L5ZI1 + 1;
+      L4Zeta  : constant Zeta_Range := Zeta_ExpC (L4ZI);
+      L5Zeta1 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2);
+      L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2 + 1);
    begin
-      NTT_Inv_Inner5 (F, L5ZI2, Start);
-      NTT_Inv_Inner5 (F, L5ZI1, Start + 16);
-      NTT_Inv_Inner4 (F, L4ZI,  Start);
+      for I in Index_256 range 0 .. 7 loop
+         declare
+            CI0  : constant Index_256 := Start + I;
+            CI8  : constant Index_256 := CI0  + 8;
+            CI16 : constant Index_256 := CI8  + 8;
+            CI24 : constant Index_256 := CI16 + 8;
+         begin
+            declare
+               C0   : constant Mont_Range2 := F (CI0);
+               C8   : constant Mont_Range2 := F (CI8);
+               C16  : constant Mont_Range2 := F (CI16);
+               C24  : constant Mont_Range2 := F (CI24);
+            begin
+               F (CI0) := C0 + C8;
+               F (CI8) := FQMul (L5Zeta2, C8 - C0);
+
+               F (CI16) := C16 + C24;
+               F (CI24) := FQMul (L5Zeta1, C24 - C16);
+            end;
+
+            declare
+               C0   : constant Mont_Range4 := F (CI0);
+               C8   : constant Mont_Range4 := F (CI8);
+               C16  : constant Mont_Range4 := F (CI16);
+               C24  : constant Mont_Range4 := F (CI24);
+            begin
+               F (CI0)  := C16 + C0;
+               F (CI16) := FQMul (L4Zeta, C16 - C0);
+
+               F (CI8)  := C24 + C8;
+               F (CI24) := FQMul (L4Zeta, C24 - C8);
+            end;
+         end;
+
+         pragma Loop_Invariant (for all K in I256 range 0              .. Start - 1      => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range Start          .. Start + I      => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range Start + I + 1  .. Start + 7      => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 8      .. Start + 8 + I  => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range Start + 9 + I  .. Start + 15     => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 16     .. Start + 16 + I => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range Start + 17 + I .. Start + 23     => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 24     .. Start + 24 + I => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range Start + 25 + I .. Start + 31     => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 32     .. 255            => F (K) in Mont_Range2);
+      end loop;
    end Layer54_Slice;
 
    procedure Layer54 (F : in out Poly_Zq)
