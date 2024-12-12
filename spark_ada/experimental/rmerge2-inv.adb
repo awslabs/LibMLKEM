@@ -14,16 +14,16 @@ is
    procedure Invert_And_Reduce (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range8),
-          Post => (for all K in Index_256 => F (K) in Mont_Range);
+          Pre  => (for all K in I256 => F (K) in Mont_Range8),
+          Post => (for all K in I256 => F (K) in Mont_Range);
 
    procedure Invert_And_Reduce (F : in out Poly_Zq)
    is
    begin
-      for I in Index_256 loop
+      for I in I256 loop
          F (I) := FQMul (1441, F (I));
-         pragma Loop_Invariant (for all K in Index_256 range 0     .. I   => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in Index_256 range I + 1 .. 255 => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range 0     .. I   => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range I + 1 .. 255 => F (K) in Mont_Range8);
       end loop;
    end Invert_And_Reduce;
 
@@ -32,7 +32,7 @@ is
    --  Reduction.
    procedure NTT_Inv_Inner (F     : in out Poly_Zq;
                             ZI    : in     SU7;
-                            Start : in     Index_256;
+                            Start : in     I256;
                             Len   : in     I32)
      with No_Inline,
           Global => null,
@@ -40,54 +40,54 @@ is
                     Len <= 128 and then
                     Start <= 252 and then
                     Start + 2 * Len <= 256 and then
-                    (for all K in Index_256 => F (K) in Mont_Range),
-          Post   => (for all K in Index_256 => F (K) in Mont_Range);
+                    (for all K in I256 => F (K) in Mont_Range),
+          Post   => (for all K in I256 => F (K) in Mont_Range);
 
    procedure NTT_Inv_Inner (F     : in out Poly_Zq;
                             ZI    : in     SU7;
-                            Start : in     Index_256;
+                            Start : in     I256;
                             Len   : in     I32)
    is
       T : I16;
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
    begin
-      for J in Index_256 range Start .. Start + (Len - 1) loop
+      for J in I256 range Start .. Start + (Len - 1) loop
          T           := F (J);
          F (J)       := Barrett_Reduce (T + F (J + Len)); --  Reduce
          F (J + Len) := FQMul (Zeta, F (J + Len) - T); -- Reduce
 
          pragma Loop_Invariant
             -- Elements 0 .. Start - 1 are unchanged
-           (for all I in Index_256 range 0 .. Start - 1 => F (I) = F'Loop_Entry (I));
+           (for all I in I256 range 0 .. Start - 1 => F (I) = F'Loop_Entry (I));
          pragma Loop_Invariant
             -- Elements Start through J are updated and in BRange
-           (for all I in Index_256 range Start .. J => F (I) in BRange);
+           (for all I in I256 range Start .. J => F (I) in BRange);
          pragma Loop_Invariant
             -- Elements Start through J are updated and ALSO in Mont_Range
-           (for all I in Index_256 range Start .. J => F (I) in Mont_Range);
+           (for all I in I256 range Start .. J => F (I) in Mont_Range);
          pragma Loop_Invariant
             -- Elements J + 1 .. Start + Len - 1 are unchanged
-           (for all I in Index_256 range J + 1 .. Start + Len - 1 => F (I) = F'Loop_Entry (I));
+           (for all I in I256 range J + 1 .. Start + Len - 1 => F (I) = F'Loop_Entry (I));
          pragma Loop_Invariant
             --  Elements Start + Len through J + Len are updated and in Mont_Range
-           (for all I in Index_256 range Start + Len .. J + Len => (F (I) in Mont_Range));
+           (for all I in I256 range Start + Len .. J + Len => (F (I) in Mont_Range));
          pragma Loop_Invariant
             --  Elements from J + Len + 1 .. 255 are unchanged
-           (for all I in Index_256 range J + Len + 1 .. 255 => F (I) = F'Loop_Entry (I));
+           (for all I in I256 range J + Len + 1 .. 255 => F (I) = F'Loop_Entry (I));
 
       end loop;
 
       --  (J = Start + Len - 1) => Postcondition
       pragma Assert
          -- Elements Start through J are updated and in Mont_Range
-        (for all I in Index_256 range Start .. Start + Len - 1 => F (I) in Mont_Range);
+        (for all I in I256 range Start .. Start + Len - 1 => F (I) in Mont_Range);
       pragma Assert
          --  Elements Start + Len through J + Len are updated and in Mont_Range
-        (for all I in Index_256 range Start + Len .. Start + Len - 1 + Len => (F (I) in Mont_Range));
+        (for all I in I256 range Start + Len .. Start + Len - 1 + Len => (F (I) in Mont_Range));
 
       --  All other elements preserve their initial values, so still in Mont_Range
       --  as per the precondition, so...
-      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
+      pragma Assert (for all K in I256 => F (K) in Mont_Range);
 
    end NTT_Inv_Inner;
 
@@ -99,12 +99,12 @@ is
       subtype NTT_Len_Power     is Natural range 1 .. 7;
 
       --  A power of 2 between 2 and 128. Used in NTT and NTT_Inv
-      subtype Len_T is Index_256
+      subtype Len_T is I256
          with Dynamic_Predicate =>
             (for some I in NTT_Len_Power => Len_T = 2**I);
 
       --  A power of 2 between 1 and 64. Used in NTT and NTT_Inv
-      subtype Count_T is Index_256
+      subtype Count_T is I256
          with Dynamic_Predicate =>
             (for some I in NTT_Len_Bit_Index => Count_T = 2**I);
 
@@ -131,7 +131,7 @@ is
             pragma Loop_Invariant (Count * Len = 128);
             pragma Loop_Invariant (J * 2 * Len <= 252);
             pragma Loop_Invariant (I32 (K) = 2**I + Count - J - 1);
-            pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+            pragma Loop_Invariant (for all K in I256 => F (K) in Mont_Range);
 
             NTT_Inv_Inner (F     => F,
                            ZI    => K,
@@ -145,12 +145,12 @@ is
          --  K = 2**I + Count - Count - 1, which simplifies to
          pragma Loop_Invariant (I32 (K) = 2**I - 1);
          pragma Loop_Invariant (Count * Len = 128);
-         pragma Loop_Invariant (for all K in Index_256 => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 => F (K) in Mont_Range);
       end loop;
 
       --  Substitute I = 0 into the outer loop invariant to get
       pragma Assert (K = 0);
-      pragma Assert (for all K in Index_256 => F (K) in Mont_Range);
+      pragma Assert (for all K in I256 => F (K) in Mont_Range);
 
    end INTT;
 
@@ -166,25 +166,25 @@ is
    --  ================
 
    procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
+                                   ZI    : in     SU7;
+                                   Start : in     I256)
      with Global => null,
           Pre  => ZI in 64 .. 127 and then
                   Start <= 252 and then
-                  (for all I in Index_256 range Start .. Start + 3 => (F (I) in I16)),
-          Post => ((for all I in Index_256 range 0         .. Start - 1 => (F (I) = F'Old (I))) and
-                   (for all I in Index_256 range Start     .. Start + 3 => (F (I) in Mont_Range)) and
-                   (for all I in Index_256 range Start + 4 .. 255       => (F (I) = F'Old (I))));
+                  (for all I in I256 range Start .. Start + 3 => (F (I) in I16)),
+          Post => ((for all I in I256 range 0         .. Start - 1 => (F (I) = F'Old (I))) and
+                   (for all I in I256 range Start     .. Start + 3 => (F (I) in Mont_Range)) and
+                   (for all I in I256 range Start + 4 .. 255       => (F (I) = F'Old (I))));
 
    procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
-                             Start : in     Index_256)
+                                   ZI    : in     SU7;
+                                   Start : in     I256)
    is
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
-      CI0 : constant Index_256 := Start;
-      CI1 : constant Index_256 := CI0 + 1;
-      CI2 : constant Index_256 := CI0 + 2;
-      CI3 : constant Index_256 := CI0 + 3;
+      CI0  : constant Index_256 := Start;
+      CI1  : constant Index_256 := CI0 + 1;
+      CI2  : constant Index_256 := CI0 + 2;
+      CI3  : constant Index_256 := CI0 + 3;
 
       --  Invert and reduce all coefficients here the first time they
       --  are read. This is efficient, and also means we can accept
@@ -205,7 +205,7 @@ is
    procedure InvertLayer7 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Post  => (for all K in Index_256 => F (K) in Mont_Range);
+          Post  => (for all K in I256 => F (K) in Mont_Range);
 
    procedure InvertLayer7 (F : in out Poly_Zq)
    is
@@ -223,30 +223,30 @@ is
 
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
                              ZI    : in     SU7;
-                             Start : in     Index_256)
+                             Start : in     I256)
      with Global => null,
           Pre    => ZI in 32 .. 63 and then
                     Start <= 248 and then
                     Start mod 8 = 0 and then
-                    (for all K in Index_256 range Start .. Start + 7 => F (K) in Mont_Range),
-          Post   => (for all K in Index_256 range 0         .. Start - 1 => F (K) = F'Old (K)) and
-                    (for all K in Index_256 range Start     .. Start + 7 => F (K) in Mont_Range2) and
-                    (for all K in Index_256 range Start + 8 .. 255       => F (K) = F'Old (K));
+                    (for all K in I256 range Start     .. Start + 7 => F (K) in Mont_Range),
+          Post   => (for all K in I256 range 0         .. Start - 1 => F (K) = F'Old (K)) and
+                    (for all K in I256 range Start     .. Start + 7 => F (K) in Mont_Range2) and
+                    (for all K in I256 range Start + 8 .. 255       => F (K) = F'Old (K));
 
 
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
                              ZI    : in     SU7;
-                             Start : in     Index_256)
+                             Start : in     I256)
    is
       Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
-      CI0 : constant Index_256 := Start;
-      CI1 : constant Index_256 := CI0 + 1;
-      CI2 : constant Index_256 := CI0 + 2;
-      CI3 : constant Index_256 := CI0 + 3;
-      CI4 : constant Index_256 := CI0 + 4;
-      CI5 : constant Index_256 := CI0 + 5;
-      CI6 : constant Index_256 := CI0 + 6;
-      CI7 : constant Index_256 := CI0 + 7;
+      CI0 : constant I256 := Start;
+      CI1 : constant I256 := CI0 + 1;
+      CI2 : constant I256 := CI0 + 2;
+      CI3 : constant I256 := CI0 + 3;
+      CI4 : constant I256 := CI0 + 4;
+      CI5 : constant I256 := CI0 + 5;
+      CI6 : constant I256 := CI0 + 6;
+      CI7 : constant I256 := CI0 + 7;
       C0  : constant I16 := F (CI0);
       C1  : constant I16 := F (CI1);
       C2  : constant I16 := F (CI2);
@@ -272,8 +272,8 @@ is
    procedure Layer6 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in Mont_Range),
-          Post => (for all K in Index_256 => F (K) in Mont_Range2);
+          Pre  => (for all K in I256 => F (K) in Mont_Range),
+          Post => (for all K in I256 => F (K) in Mont_Range2);
 
    procedure Layer6 (F : in out Poly_Zq)
    is
@@ -293,31 +293,31 @@ is
 
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
-                            Start : in     Index_256)
+                            Start : in     I256)
      with Global => null,
           No_Inline,
           Pre  => L4ZI in 8 .. 15 and then
                   Start <= 224 and then
                   Start mod 32 = 0 and then
-                  (for all I in Index_256 range 0     .. Start - 1  => F (I) in Mont_Range) and then
-                  (for all I in Index_256 range Start .. 255        => F (I) in Mont_Range2),
-          Post => (for all I in Index_256 range 0          .. Start + 31 => F (I) in Mont_Range) and
-                  (for all I in Index_256 range Start + 32 .. 255        => F (I) in Mont_Range2);
+                  (for all I in I256 range 0          .. Start - 1  => F (I) in Mont_Range) and then
+                  (for all I in I256 range Start      .. 255        => F (I) in Mont_Range2),
+          Post => (for all I in I256 range 0          .. Start + 31 => F (I) in Mont_Range) and
+                  (for all I in I256 range Start + 32 .. 255        => F (I) in Mont_Range2);
 
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
-                            Start : in     Index_256)
+                            Start : in     I256)
    is
       L4Zeta  : constant Zeta_Range := Zeta_ExpC (L4ZI);
       L5Zeta1 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2);
       L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2 + 1);
    begin
-      for I in Index_256 range 0 .. 7 loop
+      for I in I256 range 0 .. 7 loop
          declare
-            CI0  : constant Index_256 := Start + I;
-            CI8  : constant Index_256 := CI0  + 8;
-            CI16 : constant Index_256 := CI8  + 8;
-            CI24 : constant Index_256 := CI16 + 8;
+            CI0  : constant I256 := Start + I;
+            CI8  : constant I256 := CI0  + 8;
+            CI16 : constant I256 := CI8  + 8;
+            CI24 : constant I256 := CI16 + 8;
          begin
             declare
                C0   : constant Mont_Range2 := F (CI0);
@@ -364,8 +364,8 @@ is
    procedure Layer54 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all I in Index_256 => F (I) in Mont_Range2),
-          Post => (for all I in Index_256 => F (I) in Mont_Range);
+          Pre  => (for all I in I256 => F (I) in Mont_Range2),
+          Post => (for all I in I256 => F (I) in Mont_Range);
 
    procedure Layer54 (F : in out Poly_Zq)
    is
@@ -387,8 +387,8 @@ is
    procedure Layer321 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
-          Pre  => (for all I in Index_256 => F (I) in Mont_Range),
-          Post => (for all I in Index_256 => F (I) in Mont_Range8);
+          Pre  => (for all I in I256 => F (I) in Mont_Range),
+          Post => (for all I in I256 => F (I) in Mont_Range8);
 
    procedure Layer321 (F : in out Poly_Zq)
    is
@@ -408,7 +408,7 @@ is
       --   NTT_Inv_Inner (F, 3, 0, 64);
       --   NTT_Inv_Inner (F, 2, 128, 64);
       --  to get:
-      for J in Index_256 range 0 .. 31 loop
+      for J in I256 range 0 .. 31 loop
          declare
             CI0   : constant I256 := J;
             CI32  : constant I256 := CI0 + 32;
@@ -509,8 +509,6 @@ is
       end loop;
    end Layer321;
 
-
-   --  Optimized implementation, one layer at a time
    procedure INTTnew (F : in out Poly_Zq)
    is
    begin
