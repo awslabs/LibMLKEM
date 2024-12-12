@@ -157,23 +157,9 @@ is
 
    --============================================================
    --  Part 2 - INTT optimized with exact tracking of
-   --  coefficient ranges for each layer, and deferred reduction
+   --  coefficient ranges, deferred reduction, and merging
+   --  of layers (5,4) and (3,2,1)
    --============================================================
-
-   procedure Reduce_All (F : in out Poly_Zq)
-     with Global => null,
-          No_Inline,
-          Pre  => (for all K in Index_256 => F (K) in I16),
-          Post => (for all K in Index_256 => F (K) in Mont_Range);
-
-   procedure Reduce_All (F : in out Poly_Zq)
-   is
-   begin
-      for I in F'Range loop
-         F (I) := Barrett_Reduce (F (I));
-         pragma Loop_Invariant (for all K in Index_256 range 0 .. I => F (K) in Mont_Range);
-      end loop;
-   end Reduce_All;
 
    --  ================
    --  Layer 7
