@@ -189,11 +189,14 @@ is
       --  Invert and reduce all coefficients here the first time they
       --  are read. This is efficient, and also means we can accept
       --  any I16 value for all coefficients as input.
-      C0  : constant Mont_Range := FQMul (1441, F (CI0));
-      C1  : constant Mont_Range := FQMul (1441, F (CI1));
-      C2  : constant Mont_Range := FQMul (1441, F (CI2));
-      C3  : constant Mont_Range := FQMul (1441, F (CI3));
+      CINV : constant := 1441;
+      C0  : constant Mont_Range := FQMul (CINV, F (CI0));
+      C1  : constant Mont_Range := FQMul (CINV, F (CI1));
+      C2  : constant Mont_Range := FQMul (CINV, F (CI2));
+      C3  : constant Mont_Range := FQMul (CINV, F (CI3));
    begin
+      --  Reduce all coefficients here to be bounded by Mont_Range, to
+      --  meet the precondition of Layer6
       F (CI0) := Barrett_Reduce (C0 + C2);
       F (CI2) := FQMul (Zeta, (C2 - C0));
 
@@ -256,16 +259,18 @@ is
       C6  : constant I16 := F (CI6);
       C7  : constant I16 := F (CI7);
    begin
-      F (CI0) := C0 + C4; --  Defer reduction
+      --  Defer reduction of coefficients 0, 1, 2, and 3 here so they
+      --  are bounded to Mont_Range2 after Layer6
+      F (CI0) := C0 + C4;
       F (CI4) := FQMul (Zeta, C4 - C0);
 
-      F (CI1) := C1 + C5; --  Defer reduction
+      F (CI1) := C1 + C5;
       F (CI5) := FQMul (Zeta, C5 - C1);
 
-      F (CI2) := C2 + C6; --  Defer reduction
+      F (CI2) := C2 + C6;
       F (CI6) := FQMul (Zeta, C6 - C2);
 
-      F (CI3) := C3 + C7; --  Defer reduction
+      F (CI3) := C3 + C7;
       F (CI7) := FQMul (Zeta, C7 - C3);
    end NTT_Inv_Inner6;
 
@@ -319,12 +324,14 @@ is
             CI16 : constant I256 := CI8  + 8;
             CI24 : constant I256 := CI16 + 8;
          begin
+            --  Layer 5
             declare
                C0   : constant Mont_Range2 := F (CI0);
                C8   : constant Mont_Range2 := F (CI8);
                C16  : constant Mont_Range2 := F (CI16);
                C24  : constant Mont_Range2 := F (CI24);
             begin
+               --  Defer reduction of coeffs 0 and 16 here
                F (CI0) := C0 + C8;
                F (CI8) := FQMul (L5Zeta2, C8 - C0);
 
@@ -332,6 +339,7 @@ is
                F (CI24) := FQMul (L5Zeta1, C24 - C16);
             end;
 
+            --  Layer 4
             declare
                C0   : constant Mont_Range4 := F (CI0);
                C8   : constant Mont_Range  := F (CI8);
@@ -361,6 +369,9 @@ is
       end loop;
    end Layer54_Slice;
 
+   --  Layer54 starts assuming all coeffs are bounded by Mont_Range2. After Layer5, some are bounded
+   --  by Mont_Range4. After Layer4, some are bounded by Mont_Range8, and so are immediately reduced
+   --  back to Mont_Range, in order to meet the precondition of Layer321
    procedure Layer54 (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
@@ -513,7 +524,7 @@ is
    is
    begin
       InvertLayer7 (F);
-      Layer6 (F);
+      Layer6  (F);
       Layer54 (F);
       Layer321(F);
    end INTTnew;
