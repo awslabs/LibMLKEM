@@ -21,9 +21,9 @@ is
    is
    begin
       for I in I256 loop
+         pragma Loop_Invariant (for all K in I256 range 0 .. I - 1 => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range I .. 255   => F (K) in Mont_Range8);
          F (I) := FQMul (1441, F (I));
-         pragma Loop_Invariant (for all K in I256 range 0     .. I   => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range I + 1 .. 255 => F (K) in Mont_Range8);
       end loop;
    end Invert_And_Reduce;
 
@@ -214,8 +214,8 @@ is
    is
    begin
       for J in I32 range 0 .. 63 loop
+         pragma Loop_Invariant (for all K in I32 range 0 .. ((J - 1) * 4 + 3) => F (K) in Mont_Range);
          NTT_Inv_InvertInner7 (F, 127 - J, J * 4);
-         pragma Loop_Invariant (for all K in I32 range 0 .. (J * 4 + 3) => F (K) in Mont_Range);
       end loop;
    end InvertLayer7;
 
@@ -284,11 +284,11 @@ is
    is
    begin
       for J in I32 range 0 .. 31 loop
-         NTT_Inv_Inner6 (F, 63 - J, J * 8);
-
          --  Elements modified so far increase in magnitude as follows:
-         pragma Loop_Invariant (for all K in I32 range 0         .. J * 8 + 7 => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I32 range J * 8 + 8 .. 255       => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I32 range 0     .. J * 8 - 1 => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I32 range J * 8 .. 255       => F (K) in Mont_Range);
+
+         NTT_Inv_Inner6 (F, 63 - J, J * 8);
       end loop;
    end Layer6;
 
@@ -318,6 +318,17 @@ is
       L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2 + 1);
    begin
       for I in I256 range 0 .. 7 loop
+         pragma Loop_Invariant (for all K in I256 range 0              .. Start - 1       => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range Start          .. Start + (I - 1) => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range Start + I      .. Start + 7       => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 8      .. Start + 7 + I   => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range Start + 8 + I  .. Start + 15      => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 16     .. Start + 15 + I  => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range Start + 16 + I .. Start + 23      => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 24     .. Start + 23 + I  => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range Start + 24 + I .. Start + 31      => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range Start + 32     .. 255             => F (K) in Mont_Range2);
+
          declare
             CI0  : constant I256 := Start + I;
             CI8  : constant I256 := CI0  + 8;
@@ -355,17 +366,6 @@ is
                F (CI24) := FQMul (L4Zeta, C24 - C8);
             end;
          end;
-
-         pragma Loop_Invariant (for all K in I256 range 0              .. Start - 1      => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range Start          .. Start + I      => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range Start + I + 1  .. Start + 7      => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range Start + 8      .. Start + 8 + I  => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range Start + 9 + I  .. Start + 15     => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range Start + 16     .. Start + 16 + I => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range Start + 17 + I .. Start + 23     => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range Start + 24     .. Start + 24 + I => F (K) in Mont_Range);
-         pragma Loop_Invariant (for all K in I256 range Start + 25 + I .. Start + 31     => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range Start + 32     .. 255            => F (K) in Mont_Range2);
       end loop;
    end Layer54_Slice;
 
@@ -420,6 +420,16 @@ is
       --   NTT_Inv_Inner (F, 2, 128, 64);
       --  to get:
       for J in I256 range 0 .. 31 loop
+         pragma Loop_Invariant (for all K in I256 range 0      .. J - 1  => F (K) in Mont_Range8);
+         pragma Loop_Invariant (for all K in I256 range J      .. 31     => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range 32     .. 31 + J => F (K) in Mont_Range4);
+         pragma Loop_Invariant (for all K in I256 range 32 + J .. 63     => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range 64     .. 63 + J => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range 64 + J .. 95     => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range 96     .. 95 + J => F (K) in Mont_Range2);
+         pragma Loop_Invariant (for all K in I256 range 96 + J .. 127    => F (K) in Mont_Range);
+         pragma Loop_Invariant (for all K in I256 range 128    .. 255    => F (K) in Mont_Range);
+
          declare
             CI0   : constant I256 := J;
             CI32  : constant I256 := CI0 + 32;
@@ -502,21 +512,6 @@ is
                F (CI224) := FQMul (Zeta1, C224 - C96);
             end;
          end;
-
-         pragma Loop_Invariant (for all K in I256 range 0     ..  J => F (K) in Mont_Range8);
-         pragma Loop_Invariant (for all K in I256 range J + 1 .. 31 => F (K) in Mont_Range);
-
-         pragma Loop_Invariant (for all K in I256 range 32         .. 32 + J => F (K) in Mont_Range4);
-         pragma Loop_Invariant (for all K in I256 range 32 + J + 1 .. 63     => F (K) in Mont_Range);
-
-         pragma Loop_Invariant (for all K in I256 range 64         .. 64 + J => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range 64 + J + 1 .. 95     => F (K) in Mont_Range);
-
-         pragma Loop_Invariant (for all K in I256 range 96         .. 96 + J => F (K) in Mont_Range2);
-         pragma Loop_Invariant (for all K in I256 range 96 + J + 1 .. 127    => F (K) in Mont_Range);
-
-         pragma Loop_Invariant (for all K in I256 range 128        .. 255 => F (K) in Mont_Range);
-
       end loop;
    end Layer321;
 
