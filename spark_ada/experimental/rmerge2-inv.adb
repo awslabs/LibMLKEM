@@ -296,12 +296,35 @@ is
    --  Layer 54
    --  ================
 
+   subtype L4_Zeta_Index is I32 range 0 .. 7;
+   subtype Zeta_Range32 is I32 range Zeta_Min .. Zeta_Max;
+
+   type L54_Zeta_Group is record
+      Parent_Zeta      : Zeta_Range32; -- 32 bits
+      Left_Child_Zeta  : Zeta_Range;   -- 16 bits
+      Right_Child_Zeta : Zeta_Range;   -- 16 bits
+   end record
+     with Object_Size => 64;
+
+   type L54_Zeta_Table_Type is array (L4_Zeta_Index) of L54_Zeta_Group
+     with Alignment => 32;
+
+   L54_Zetas_Table : constant L54_Zeta_Table_Type :=
+     (0 => ( -171,   573, -1325),
+      1 => (  622,   264,   383),
+      2 => ( 1577,  -829,  1458),
+      3 => (  182, -1602,  -130),
+      4 => (  962,  -681,  1017),
+      5 => (-1202,   732,   608),
+      6 => (-1474, -1542,   411),
+      7 => ( 1468,  -205, -1571));
+
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
                             Start : in     I256)
      with Global => null,
           No_Inline,
-          Pre  => L4ZI in 8 .. 15 and then
+          Pre  => L4ZI in 0 .. 7 and then
                   Start <= 224 and then
                   Start mod 32 = 0 and then
                   (for all I in I256 range 0          .. Start - 1  => F (I) in Mont_Range) and then
@@ -313,9 +336,10 @@ is
                             L4ZI  : in     SU7;
                             Start : in     I256)
    is
-      L4Zeta  : constant Zeta_Range := Zeta_ExpC (L4ZI);
-      L5Zeta1 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2);
-      L5Zeta2 : constant Zeta_Range := Zeta_ExpC (L4ZI * 2 + 1);
+      Zetas   : constant L54_Zeta_Group := L54_Zetas_Table (L4ZI);
+      L4Zeta  : constant Zeta_Range := Zeta_Range (Zetas.Parent_Zeta);
+      L5Zeta1 : constant Zeta_Range := Zetas.Left_Child_Zeta;
+      L5Zeta2 : constant Zeta_Range := Zetas.Right_Child_Zeta;
    begin
       for I in I256 range 0 .. 7 loop
          pragma Loop_Invariant (for all K in I256 range 0              .. Start - 1       => F (K) in Mont_Range);
@@ -381,14 +405,14 @@ is
    procedure Layer54 (F : in out Poly_Zq)
    is
    begin
-      Layer54_Slice (F, 15, 0);
-      Layer54_Slice (F, 14, 32);
-      Layer54_Slice (F, 13, 64);
-      Layer54_Slice (F, 12, 96);
-      Layer54_Slice (F, 11, 128);
-      Layer54_Slice (F, 10, 160);
-      Layer54_Slice (F,  9, 192);
-      Layer54_Slice (F,  8, 224);
+      Layer54_Slice (F, 7, 0);
+      Layer54_Slice (F, 6, 32);
+      Layer54_Slice (F, 5, 64);
+      Layer54_Slice (F, 4, 96);
+      Layer54_Slice (F, 3, 128);
+      Layer54_Slice (F, 2, 160);
+      Layer54_Slice (F, 1, 192);
+      Layer54_Slice (F, 0, 224);
    end Layer54;
 
    --  ================
