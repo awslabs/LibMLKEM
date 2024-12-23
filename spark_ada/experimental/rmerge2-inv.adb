@@ -224,12 +224,30 @@ is
    --  Layer 6
    --  ================
 
+   subtype L6_Zeta_Index is I32 range 0 .. 31;
+
+   type L6_Zeta_Table_Type is array (L6_Zeta_Index) of Zeta_Range;
+   L6_Zetas_Table : constant L6_Zeta_Table_Type :=
+     (1223,   652,  -552,  1015, -1293,  1491,  -282, -1544,
+       516,    -8,  -320,  -666, -1618, -1162,   126,  1469,
+      -853,   -90,  -271,   830,   107, -1421,  -247,  -951,
+      -398,   961, -1508,  -725,   448, -1065,   677, -1275);
+
+--  As L6_Zetas_Table, but reverse order for inverse NTT.
+--  Potentially saves a single "-" operator in Layer6, but
+--  appears to be slower at -O3 with GCC 14.2.0 on AArch64
+--
+--   L6_Inverse_Zetas_Table : constant L6_Zeta_Table_Type :=
+--     (-1275,   677, -1065,   448, -725, -1508, 961, -398,
+--       -951,  -247, -1421,   107,  830,  -271, -90, -853,
+--       1469,   126, -1162, -1618, -666,  -320,  -8,  516,
+--      -1544,  -282,  1491, -1293, 1015,  -552, 652, 1223);
+
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
+                             ZI    : in     L6_Zeta_Index;
                              Start : in     I256)
      with Global => null,
-          Pre    => ZI in 32 .. 63 and then
-                    Start <= 248 and then
+          Pre    => Start <= 248 and then
                     Start mod 8 = 0 and then
                     (for all K in I256 range Start     .. Start + 7 => F (K) in Mont_Range),
           Post   => (for all K in I256 range 0         .. Start - 1 => F (K) = F'Old (K)) and
@@ -238,10 +256,10 @@ is
 
 
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
-                             ZI    : in     SU7;
+                             ZI    : in     L6_Zeta_Index;
                              Start : in     I256)
    is
-      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
+      Zeta : constant Zeta_Range := L6_Zetas_Table (ZI);
       CI0 : constant I256 := Start;
       CI1 : constant I256 := CI0 + 1;
       CI2 : constant I256 := CI0 + 2;
@@ -283,12 +301,12 @@ is
    procedure Layer6 (F : in out Poly_Zq)
    is
    begin
-      for J in I32 range 0 .. 31 loop
+      for J in L6_Zeta_Index loop
          --  Elements modified so far increase in magnitude as follows:
          pragma Loop_Invariant (for all K in I32 range 0     .. J * 8 - 1 => F (K) in Mont_Range2);
          pragma Loop_Invariant (for all K in I32 range J * 8 .. 255       => F (K) in Mont_Range);
 
-         NTT_Inv_Inner6 (F, 63 - J, J * 8);
+         NTT_Inv_Inner6 (F, 31 - J, J * 8);
       end loop;
    end Layer6;
 
@@ -297,27 +315,22 @@ is
    --  ================
 
    subtype L4_Zeta_Index is I32 range 0 .. 7;
-   subtype Zeta_Range32 is I32 range Zeta_Min .. Zeta_Max;
 
-   type L54_Zeta_Group is record
-      Parent_Zeta      : Zeta_Range32; -- 32 bits
-      Left_Child_Zeta  : Zeta_Range;   -- 16 bits
-      Right_Child_Zeta : Zeta_Range;   -- 16 bits
-   end record
-     with Object_Size => 64;
+   type L54_Zeta_Table_Type is array (L4_Zeta_Index) of Zeta_Range;
+   --  Zeta values for layer 4, originally occupying
+   --  positions 8 .. 15 in the full Zeta table.
+   L4_Zetas_Table : constant L54_Zeta_Table_Type :=
+     (-171, 622, 1577, 182, 962, -1202, -1474, 1468);
 
-   type L54_Zeta_Table_Type is array (L4_Zeta_Index) of L54_Zeta_Group
-     with Alignment => 32;
+   --  Zeta values for layer 5, originally occupying "even"
+   --  positions 16,18,20,22,24,26,28,30 in the full Zeta table.
+   L5_Even_Zetas_Table : constant L54_Zeta_Table_Type :=
+     (573, 264, -829, -1602, -681, 732, -1542, -205);
 
-   L54_Zetas_Table : constant L54_Zeta_Table_Type :=
-     (0 => ( -171,   573, -1325),
-      1 => (  622,   264,   383),
-      2 => ( 1577,  -829,  1458),
-      3 => (  182, -1602,  -130),
-      4 => (  962,  -681,  1017),
-      5 => (-1202,   732,   608),
-      6 => (-1474, -1542,   411),
-      7 => ( 1468,  -205, -1571));
+   --  Zeta values for layer 5, originally occupying "odd"
+   --  positions 17,19,21,23,25,27,29,31 in the full Zeta table.
+   L5_Odd_Zetas_Table : constant L54_Zeta_Table_Type :=
+     (-1325, 383, 1458, -130, 1017, 608, 411, -1571);
 
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
@@ -336,10 +349,9 @@ is
                             L4ZI  : in     SU7;
                             Start : in     I256)
    is
-      Zetas   : constant L54_Zeta_Group := L54_Zetas_Table (L4ZI);
-      L4Zeta  : constant Zeta_Range := Zeta_Range (Zetas.Parent_Zeta);
-      L5Zeta1 : constant Zeta_Range := Zetas.Left_Child_Zeta;
-      L5Zeta2 : constant Zeta_Range := Zetas.Right_Child_Zeta;
+      L4Zeta  : constant Zeta_Range := L4_Zetas_Table (L4ZI);
+      L5Zeta1 : constant Zeta_Range := L5_Even_Zetas_Table (L4ZI);
+      L5Zeta2 : constant Zeta_Range := L5_Odd_Zetas_Table (L4ZI);
    begin
       for I in I256 range 0 .. 7 loop
          pragma Loop_Invariant (for all K in I256 range 0              .. Start - 1       => F (K) in Mont_Range);
