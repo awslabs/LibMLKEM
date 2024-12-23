@@ -9,8 +9,15 @@ is
    --  of coefficients
    --============================================================
 
-   --  Multiply all coefficients by F = mont^2/128 = 1441, and
-   --  reduce so all coefficients in Mont_Range
+   --  MONT_F = mont^2/128 = 1441.
+   --  Used to invert and reduce coefficients in the Inverse NTT.
+   MONT_F : constant := 1441;
+
+   function Invert_And_Reduce (B : in I16) return Mont_Range
+     is (FQMul (MONT_F, B))
+     with Global => null,
+          Inline_Always;
+
    procedure Invert_And_Reduce (F : in out Poly_Zq)
      with Global => null,
           No_Inline,
@@ -23,7 +30,7 @@ is
       for I in I256 loop
          pragma Loop_Invariant (for all K in I256 range 0 .. I - 1 => F (K) in Mont_Range);
          pragma Loop_Invariant (for all K in I256 range I .. 255   => F (K) in Mont_Range8);
-         F (I) := FQMul (1441, F (I));
+         F (I) := Invert_And_Reduce (F (I));
       end loop;
    end Invert_And_Reduce;
 
@@ -188,11 +195,10 @@ is
       --  Invert and reduce all coefficients here the first time they
       --  are read. This is efficient, and also means we can accept
       --  any I16 value for all coefficients as input.
-      CINV : constant := 1441;
-      C0  : constant Mont_Range := FQMul (CINV, F (CI0));
-      C1  : constant Mont_Range := FQMul (CINV, F (CI1));
-      C2  : constant Mont_Range := FQMul (CINV, F (CI2));
-      C3  : constant Mont_Range := FQMul (CINV, F (CI3));
+      C0  : constant Mont_Range := Invert_And_Reduce (F (CI0));
+      C1  : constant Mont_Range := Invert_And_Reduce (F (CI1));
+      C2  : constant Mont_Range := Invert_And_Reduce (F (CI2));
+      C3  : constant Mont_Range := Invert_And_Reduce (F (CI3));
    begin
       --  Reduce all coefficients here to be bounded by Mont_Range, to
       --  meet the precondition of Layer6
