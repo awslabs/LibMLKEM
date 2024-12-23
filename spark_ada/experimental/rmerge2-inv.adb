@@ -407,13 +407,6 @@ is
 
    procedure Layer321 (F : in out Poly_Zq)
    is
-      Zeta1 : constant Zeta_Range := Zeta_ExpC (1);
-      Zeta2 : constant Zeta_Range := Zeta_ExpC (2);
-      Zeta3 : constant Zeta_Range := Zeta_ExpC (3);
-      Zeta4 : constant Zeta_Range := Zeta_ExpC (4);
-      Zeta5 : constant Zeta_Range := Zeta_ExpC (5);
-      Zeta6 : constant Zeta_Range := Zeta_ExpC (6);
-      Zeta7 : constant Zeta_Range := Zeta_ExpC (7);
    begin
       --  We inline, expand, loop-fuse and simplify this sequence of calls:
       --   NTT_Inv_Inner (F, 7, 0, 32);
@@ -457,16 +450,16 @@ is
                C224  : constant Mont_Range := F (CI224);
             begin
                F (CI0)  := C0 + C32;
-               F (CI32) := FQMul (Zeta7, C32 - C0);
+               F (CI32) := FQMul (L3Zeta7, C32 - C0);
 
                F (CI64) := C64 + C96;
-               F (CI96) := FQMul (Zeta6, C96 - C64);
+               F (CI96) := FQMul (L3Zeta6, C96 - C64);
 
                F (CI128) := C128 + C160;
-               F (CI160) := FQMul (Zeta5, C160 - C128);
+               F (CI160) := FQMul (L3Zeta5, C160 - C128);
 
                F (CI192) := C192 + C224;
-               F (CI224) := FQMul (Zeta4, C224 - C192);
+               F (CI224) := FQMul (L3Zeta4, C224 - C192);
             end;
 
             --  Layer 2
@@ -481,16 +474,16 @@ is
                C224  : constant Mont_Range  := F (CI224);
             begin
                F (CI0)  := C0 + C64;
-               F (CI64) := FQMul (Zeta3, C64 - C0);
+               F (CI64) := FQMul (L2Zeta3, C64 - C0);
 
                F (CI32) := C32 + C96;
-               F (CI96) := FQMul (Zeta3, C96 - C32);
+               F (CI96) := FQMul (L2Zeta3, C96 - C32);
 
                F (CI128) := C128 + C192;
-               F (CI192) := FQMul (Zeta2, C192 - C128);
+               F (CI192) := FQMul (L2Zeta2, C192 - C128);
 
                F (CI160) := C160 + C224;
-               F (CI224) := FQMul (Zeta2, C224 - C160);
+               F (CI224) := FQMul (L2Zeta2, C224 - C160);
             end;
 
             --  Layer 1
@@ -505,16 +498,16 @@ is
                C224  : constant Mont_Range  := F (CI224);
             begin
                F (CI0)   := C128 + C0;
-               F (CI128) := FQMul (Zeta1, C128 - C0);
+               F (CI128) := FQMul (L1Zeta1, C128 - C0);
 
                F (CI32)  := C160 + C32;
-               F (CI160) := FQMul (Zeta1, C160 - C32);
+               F (CI160) := FQMul (L1Zeta1, C160 - C32);
 
                F (CI64)  := C192 + C64;
-               F (CI192) := FQMul (Zeta1, C192 - C64);
+               F (CI192) := FQMul (L1Zeta1, C192 - C64);
 
                F (CI96)  := C224 + C96;
-               F (CI224) := FQMul (Zeta1, C224 - C96);
+               F (CI224) := FQMul (L1Zeta1, C224 - C96);
             end;
          end;
       end loop;

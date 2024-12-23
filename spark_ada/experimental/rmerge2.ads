@@ -96,6 +96,18 @@ private
       -108,  -308,   996,   991,   958, -1460,  1522,  1628);
 
 
+   ----------------------------------------
+   --  Zeta constants for layers 1, 2 and 3
+   ----------------------------------------
+
+   L1Zeta1 : constant Zeta_Range := -758;
+   L2Zeta2 : constant Zeta_Range := -359;
+   L2Zeta3 : constant Zeta_Range := -1517;
+   L3Zeta4 : constant Zeta_Range := 1493;
+   L3Zeta5 : constant Zeta_Range := 1422;
+   L3Zeta6 : constant Zeta_Range := 287;
+   L3Zeta7 : constant Zeta_Range := 202;
+
    ----------------------------------
    --  Zeta tables for merged layer54
    ----------------------------------
