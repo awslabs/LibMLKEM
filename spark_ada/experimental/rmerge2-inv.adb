@@ -166,21 +166,20 @@ is
    --  ================
 
    procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
-                                   ZI    : in     SU7;
+                                   ZI    : in     L7_Zeta_Index;
                                    Start : in     I256)
      with Global => null,
-          Pre  => ZI in 64 .. 127 and then
-                  Start <= 252 and then
+          Pre  => Start <= 252 and then
                   (for all I in I256 range Start .. Start + 3 => (F (I) in I16)),
           Post => ((for all I in I256 range 0         .. Start - 1 => (F (I) = F'Old (I))) and
                    (for all I in I256 range Start     .. Start + 3 => (F (I) in Mont_Range)) and
                    (for all I in I256 range Start + 4 .. 255       => (F (I) = F'Old (I))));
 
    procedure NTT_Inv_InvertInner7 (F     : in out Poly_Zq;
-                                   ZI    : in     SU7;
+                                   ZI    : in     L7_Zeta_Index;
                                    Start : in     I256)
    is
-      Zeta : constant Zeta_Range := Zeta_ExpC (ZI);
+      Zeta : constant Zeta_Range := L7_Zetas_Table (ZI);
       CI0  : constant Index_256 := Start;
       CI1  : constant Index_256 := CI0 + 1;
       CI2  : constant Index_256 := CI0 + 2;
@@ -215,7 +214,7 @@ is
    begin
       for J in I32 range 0 .. 63 loop
          pragma Loop_Invariant (for all K in I32 range 0 .. ((J - 1) * 4 + 3) => F (K) in Mont_Range);
-         NTT_Inv_InvertInner7 (F, 127 - J, J * 4);
+         NTT_Inv_InvertInner7 (F, 63 - J, J * 4);
       end loop;
    end InvertLayer7;
 
@@ -223,25 +222,6 @@ is
    --  ================
    --  Layer 6
    --  ================
-
-   subtype L6_Zeta_Index is I32 range 0 .. 31;
-
-   type L6_Zeta_Table_Type is array (L6_Zeta_Index) of Zeta_Range;
-   L6_Zetas_Table : constant L6_Zeta_Table_Type :=
-     (1223,   652,  -552,  1015, -1293,  1491,  -282, -1544,
-       516,    -8,  -320,  -666, -1618, -1162,   126,  1469,
-      -853,   -90,  -271,   830,   107, -1421,  -247,  -951,
-      -398,   961, -1508,  -725,   448, -1065,   677, -1275);
-
---  As L6_Zetas_Table, but reverse order for inverse NTT.
---  Potentially saves a single "-" operator in Layer6, but
---  appears to be slower at -O3 with GCC 14.2.0 on AArch64
---
---   L6_Inverse_Zetas_Table : constant L6_Zeta_Table_Type :=
---     (-1275,   677, -1065,   448, -725, -1508, 961, -398,
---       -951,  -247, -1421,   107,  830,  -271, -90, -853,
---       1469,   126, -1162, -1618, -666,  -320,  -8,  516,
---      -1544,  -282,  1491, -1293, 1015,  -552, 652, 1223);
 
    procedure NTT_Inv_Inner6 (F     : in out Poly_Zq;
                              ZI    : in     L6_Zeta_Index;
@@ -313,24 +293,6 @@ is
    --  ================
    --  Layer 54
    --  ================
-
-   subtype L4_Zeta_Index is I32 range 0 .. 7;
-
-   type L54_Zeta_Table_Type is array (L4_Zeta_Index) of Zeta_Range;
-   --  Zeta values for layer 4, originally occupying
-   --  positions 8 .. 15 in the full Zeta table.
-   L4_Zetas_Table : constant L54_Zeta_Table_Type :=
-     (-171, 622, 1577, 182, 962, -1202, -1474, 1468);
-
-   --  Zeta values for layer 5, originally occupying "even"
-   --  positions 16,18,20,22,24,26,28,30 in the full Zeta table.
-   L5_Even_Zetas_Table : constant L54_Zeta_Table_Type :=
-     (573, 264, -829, -1602, -681, 732, -1542, -205);
-
-   --  Zeta values for layer 5, originally occupying "odd"
-   --  positions 17,19,21,23,25,27,29,31 in the full Zeta table.
-   L5_Odd_Zetas_Table : constant L54_Zeta_Table_Type :=
-     (-1325, 383, 1458, -130, 1017, 608, 411, -1571);
 
    procedure Layer54_Slice (F     : in out Poly_Zq;
                             L4ZI  : in     SU7;
