@@ -422,6 +422,7 @@ is
       --   NTT_Inv_Inner (F, 4, 192, 32);
       --   NTT_Inv_Inner (F, 3, 0, 64);
       --   NTT_Inv_Inner (F, 2, 128, 64);
+      --   NTT_Inv_Inner (F, 1, 0, 0);
       --  to get:
       for J in I256 range 0 .. 31 loop
          pragma Loop_Invariant (for all K in I256 range 0      .. J - 1  => F (K) in Mont_Range8);
