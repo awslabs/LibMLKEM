@@ -1,119 +1,142 @@
-// SPDX-License-Identifier: Apache-2.0
+/*
+ * Copyright (c) The mlkem-native project authors
+ * SPDX-License-Identifier: Apache-2.0 OR ISC OR MIT
+ */
 
-///////////////////////////////////////////////////
-// Basic replacements for __CPROVER_XXX contracts
-///////////////////////////////////////////////////
+#ifndef MLK_CBMC_H
+#define MLK_CBMC_H
+/***************************************************
+ * Basic replacements for __CPROVER_XXX contracts
+ ***************************************************/
 
 #ifndef CBMC
 
-// CBMC top-level contracts are replaced by "" for compilation
-#define ASSIGNS(...)
-#define REQUIRES(...)
-#define ENSURES(...)
-#define DECREASES(...)
-#define INVARIANT(...)
-#define ASSERT(...)
-#define ASSUME(...)
+#define __contract__(x)
+#define __loop__(x)
 
-#else  // CBMC _is_ defined, therefore we're doing proof
+#else /* !CBMC */
 
-// https://diffblue.github.io/cbmc/contracts-assigns.html
-#define ASSIGNS(...) __CPROVER_assigns(__VA_ARGS__)
+#define __contract__(x) x
+#define __loop__(x) x
 
-// https://diffblue.github.io/cbmc/contracts-requires-ensures.html
-#define REQUIRES(...) __CPROVER_requires(__VA_ARGS__)
-#define ENSURES(...) __CPROVER_ensures(__VA_ARGS__)
+/* https://diffblue.github.io/cbmc/contracts-assigns.html */
+#define assigns(...) __CPROVER_assigns(__VA_ARGS__)
 
-// note we drop "loop_" here since there are no other kind of invariants
-// in CBMC. An "invariant" is _always_ a "loop invariant" so no need to
-// keep that qualification
-// https://diffblue.github.io/cbmc/contracts-loops.html
-#define INVARIANT(...) __CPROVER_loop_invariant(__VA_ARGS__)
-#define DECREASES(...) __CPROVER_decreases(__VA_ARGS__)
+/* https://diffblue.github.io/cbmc/contracts-requires-ensures.html */
+#define requires(...) __CPROVER_requires(__VA_ARGS__)
+#define ensures(...) __CPROVER_ensures(__VA_ARGS__)
+/* https://diffblue.github.io/cbmc/contracts-loops.html */
+#define invariant(...) __CPROVER_loop_invariant(__VA_ARGS__)
+#define decreases(...) __CPROVER_decreases(__VA_ARGS__)
+/* cassert to avoid confusion with in-built assert */
+#define cassert(x) __CPROVER_assert(x, "cbmc assertion failed")
+#define assume(...) __CPROVER_assume(__VA_ARGS__)
 
-#define ASSERT(...) __CPROVER_assert(__VA_ARGS__)
-#define ASSUME(...) __CPROVER_assume(__VA_ARGS__)
+/***************************************************
+ * Macros for "expression" forms that may appear
+ * _inside_ top-level contracts.
+ ***************************************************/
 
-#define READABLE(...) __CPROVER_r_ok(__VA_ARGS__)
-#define WRITEABLE(...) __CPROVER_w_ok(__VA_ARGS__)
+/*
+ * function return value - useful inside ensures
+ * https://diffblue.github.io/cbmc/contracts-functions.html
+ */
+#define return_value (__CPROVER_return_value)
 
-///////////////////////////////////////////////////
-// Macros for "expression" forms that may appear
-// _inside_ top-level contracts.
-///////////////////////////////////////////////////
+/*
+ * assigns l-value targets
+ * https://diffblue.github.io/cbmc/contracts-assigns.html
+ */
+#define object_whole(...) __CPROVER_object_whole(__VA_ARGS__)
+#define memory_slice(...) __CPROVER_object_upto(__VA_ARGS__)
+#define same_object(...) __CPROVER_same_object(__VA_ARGS__)
 
-// function return value - useful inside ENSURES
-// https://diffblue.github.io/cbmc/contracts-functions.html
-#define RETURN_VALUE (__CPROVER_return_value)
+/*
+ * Pointer-related predicates
+ * https://diffblue.github.io/cbmc/contracts-memory-predicates.html
+ */
+#define memory_no_alias(...) __CPROVER_is_fresh(__VA_ARGS__)
+#define readable(...) __CPROVER_r_ok(__VA_ARGS__)
+#define writeable(...) __CPROVER_w_ok(__VA_ARGS__)
 
-// ASSIGNS l-value targets
-// https://diffblue.github.io/cbmc/contracts-assigns.html
-#define TYPED_TARGET(...) __CPROVER_typed_target(__VA_ARGS__)
-#define OBJECT_WHOLE(...) __CPROVER_object_whole(__VA_ARGS__)
-#define OBJECT_FROM(...) __CPROVER_object_from(__VA_ARGS__)
-#define OBJECT_UPTO(...) __CPROVER_object_upto(__VA_ARGS__)
+/*
+ * History variables
+ * https://diffblue.github.io/cbmc/contracts-history-variables.html
+ */
+#define old(...) __CPROVER_old(__VA_ARGS__)
+#define loop_entry(...) __CPROVER_loop_entry(__VA_ARGS__)
 
-// Pointer-related predicates
-// https://diffblue.github.io/cbmc/contracts-memory-predicates.html
-#define IS_FRESH(...) __CPROVER_is_fresh(__VA_ARGS__)
-#define POINTER_IN_RANGE(...) __CPROVER_pointer_in_range_dfcc(__VA_ARGS__)
-#define READABLE(...) __CPROVER_r_ok(__VA_ARGS__)
-#define WRITEABLE(...) __CPROVER_w_ok(__VA_ARGS__)
+/*
+ * Quantifiers
+ * Note that the range on qvar is _exclusive_ between qvar_lb .. qvar_ub
+ * https://diffblue.github.io/cbmc/contracts-quantifiers.html
+ */
 
-// Function pointer/contract establishment
-// https://diffblue.github.io/cbmc/contracts-function-pointer-predicates.html
-#define OBEYS_CONTRACT(...) __CPROVER_obeys_contract(__VA_ARGS__)
-
-// History variables
-// https://diffblue.github.io/cbmc/contracts-history-variables.html
-#define OLD(...) __CPROVER_old(__VA_ARGS__)
-#define LOOP_ENTRY(...) __CPROVER_loop_entry(__VA_ARGS__)
-
-// Quantifiers
-// Note that the range on qvar is _inclusive_ between qvar_lb .. qvar_ub
-// https://diffblue.github.io/cbmc/contracts-quantifiers.html
-
-// Prevent clang-format from corrupting CBMC's special ==> operator
-// clang-format off
-#define FORALL(type, qvar, qvar_lb, qvar_ub, predicate)          \
-  __CPROVER_forall                                               \
-  {                                                              \
-    type qvar;                                                   \
-    ((qvar_lb) <= (qvar) && (qvar) <= (qvar_ub)) ==> (predicate) \
-  }
-// clang-format on
-
-#define EXISTS(type, qvar, qvar_lb, qvar_ub, predicate)         \
-  __CPROVER_exists {                                            \
-    type qvar;                                                  \
-    ((qvar_lb) <= (qvar) && (qvar) <= (qvar_ub)) && (predicate) \
+/*
+ * Prevent clang-format from corrupting CBMC's special ==> operator
+ */
+/* clang-format off */
+#define forall(qvar, qvar_lb, qvar_ub, predicate)                 \
+  __CPROVER_forall                                                \
+  {                                                               \
+    unsigned qvar;                                                \
+    ((qvar_lb) <= (qvar) && (qvar) < (qvar_ub)) ==> (predicate)   \
   }
 
-///////////////////////////////////////////////////
-// Convenience macros for common contract patterns
-///////////////////////////////////////////////////
-
-// Boolean-value predidate that asserts that "all values of array_var are in
-// range value_lb .. value_ub (inclusive)"
-//
-// Example:
-//  ARRAY_IN_BOUNDS(unsigned, k, 0, MLKEM_N-1, a->coeffs, -(MLKEM_Q - 1),
-//  MLKEM_Q - 1)
-// expands to
-//  __CPROVER_forall { unsigned k; (0 <= k && k <= MLKEM_N-1) ==> ( (-(MLKEM_Q -
-//  1) <= a->coeffs[k]) && (a->coeffs[k] <= (MLKEM_Q - 1))) }
-
-// Prevent clang-format from corrupting CBMC's special ==> operator
-// clang-format off
-#define ARRAY_IN_BOUNDS(indextype, qvar, qvar_lb, qvar_ub, array_var, \
-                        value_lb, value_ub)                           \
-  __CPROVER_forall                                                    \
-  {                                                                   \
-    indextype qvar;                                                   \
-    ((qvar_lb) <= (qvar) && (qvar) <= (qvar_ub)) ==>                  \
-          (((value_lb) <= (array_var[(qvar)])) &&                     \
-           ((array_var[(qvar)]) <= (value_ub)))                       \
+#define EXISTS(qvar, qvar_lb, qvar_ub, predicate)         \
+  __CPROVER_exists                                              \
+  {                                                             \
+    unsigned qvar;                                              \
+    ((qvar_lb) <= (qvar) && (qvar) < (qvar_ub)) && (predicate)  \
   }
-// clang-format on
+/* clang-format on */
 
-#endif
+/***************************************************
+ * Convenience macros for common contract patterns
+ ***************************************************/
+
+/*
+ * Boolean-value predidate that asserts that "all values of array_var are in
+ * range value_lb (inclusive) .. value_ub (exclusive)"
+ * Example:
+ *  array_bound(a->coeffs, 0, MLKEM_N, 0, MLKEM_Q)
+ * expands to
+ *  __CPROVER_forall { int k; (0 <= k && k <= MLKEM_N-1) ==> (
+ *  0 <= a->coeffs[k]) && a->coeffs[k] < MLKEM_Q)) }
+ */
+
+/*
+ * Prevent clang-format from corrupting CBMC's special ==> operator
+ */
+/* clang-format off */
+#define CBMC_CONCAT_(left, right) left##right
+#define CBMC_CONCAT(left, right) CBMC_CONCAT_(left, right)
+
+#define array_bound_core(qvar, qvar_lb, qvar_ub, array_var,            \
+                         value_lb, value_ub)                           \
+  __CPROVER_forall                                                     \
+  {                                                                    \
+    unsigned qvar;                                                     \
+    ((qvar_lb) <= (qvar) && (qvar) < (qvar_ub)) ==>                    \
+        (((int)(value_lb) <= ((array_var)[(qvar)])) &&		       \
+         (((array_var)[(qvar)]) < (int)(value_ub)))		       \
+  }
+
+#define array_bound(array_var, qvar_lb, qvar_ub, value_lb, value_ub) \
+  array_bound_core(CBMC_CONCAT(_cbmc_idx, __LINE__), (qvar_lb),      \
+      (qvar_ub), (array_var), (value_lb), (value_ub))
+/* clang-format on */
+
+/* Wrapper around array_bound operating on absolute values.
+ *
+ * The absolute value bound `k` is exclusive.
+ *
+ * Note that since the lower bound in array_bound is inclusive, we have to
+ * raise it by 1 here.
+ */
+#define array_abs_bound(arr, lb, ub, k) \
+  array_bound((arr), (lb), (ub), -((int)(k)) + 1, (k))
+
+#endif /* CBMC */
+
+#endif /* !MLK_CBMC_H */
