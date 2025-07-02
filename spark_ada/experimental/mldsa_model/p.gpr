@@ -1,0 +1,38 @@
+project P is
+
+   for Source_Dirs use (".");
+   for Object_Dir use ".";
+   for Create_Missing_Dirs use "True";
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-O2") &
+        ("-gnaty") &
+        ("-gnata") &
+        ("-fstack-usage") &
+        ("-ffunction-sections") & -- Create a linker section for each function
+        ("-fdata-sections") &    -- Create a linker section for each data area
+        ("-gnatQ");    -- Don't quit. Generate ALI and tree files even if illegalities
+
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+   package Prove is
+      for Proof_Switches ("Ada") use ("--proof=per_path",
+                                      "-j8",
+                                      "--counterexamples=on",
+                                      "--no-global-generation",
+                                      "--no-inlining",
+                                      "--no-loop-unrolling",
+                                      "--level=1",
+                                      "--prover=z3,cvc5,altergo",
+                                      "--timeout=1",
+                                      "--memlimit=0",
+                                      "--steps=2500000",
+                                      "--report=statistics");
+   end Prove;
+
+end P;
