@@ -3,6 +3,11 @@ package Sign
   with Spark_Mode => On
 is
 
+   procedure Keypair_Internal (PK   :    out Bytes_PK;
+                               SK   :    out Bytes_SK;
+                               Seed : in     Bytes_Seed)
+     with Global => null;
+
    procedure Signature_Internal (Sig    :    out Bytes_Crypto;
                                  M      : in     Byte_Seq;
                                  Prefix : in     Byte_Seq;

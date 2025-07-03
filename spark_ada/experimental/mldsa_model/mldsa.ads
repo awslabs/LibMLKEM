@@ -4,6 +4,8 @@ package MLDSA
 is
    SEEDBYTES : constant := 32;
    CRHBYTES : constant := 64;
+   KEYPAIR_SEEDBYTES : constant := 2 * SEEDBYTES + CRHBYTES;
+
    TRBYTES  : constant := 64;
    RNDBYTES  : constant := 32;
    N   : constant := 256;
@@ -22,8 +24,10 @@ is
    BETA     : constant := 196;
    GAMMA1   : constant := 2 ** 19;
    GAMMA1M1 : constant := GAMMA1 - 1;
-   GAMMA2   : constant := (QM1 / 32);
+   GAMMA2   : constant := (QM1 / 32); -- 261888
+   GAMMA2M1 : constant := GAMMA2 - 1; -- 261887
    OMEGA    : constant := 55;
+
 
    CTILDEBYTES : constant := 48;
    POLYW1_PACKEDBYTES  : constant := 128;
@@ -60,6 +64,7 @@ is
    type I32_Seq is array (Natural range <>) of I32;
 
    subtype SeedBytes_Index is Positive range 1 .. SEEDBYTES;
+   subtype KeyPair_SeedBytes_Index is Positive range 1 .. KEYPAIR_SEEDBYTES;
    subtype CTildeBytes_Index is Positive range 1 .. CTILDEBYTES;
    subtype RndBytes_Index is Positive range 1 .. RNDBYTES;
    subtype TrBytes_Index is Positive range 1 .. TRBYTES;
@@ -72,6 +77,7 @@ is
 
    subtype Bytes_Rnd is Byte_Seq (RndBytes_Index);
    subtype Bytes_Seed is Byte_Seq (SeedBytes_Index);
+   subtype Bytes_KeyPair_Seed is Byte_Seq (KeyPair_SeedBytes_Index);
    subtype Bytes_CTilde is Byte_Seq (CTildeBytes_Index);
    subtype Bytes_Tr is Byte_Seq (TrBytes_Index);
    subtype Bytes_Crh is Byte_Seq (CrhBytes_Index);
@@ -102,12 +108,16 @@ is
    end record;
 
    subtype Valid_SK_Coeff is I32 range -(2**(D - 1)) + 1 .. (2**(D - 1));
+   subtype Valid_Natural_SK_Coeff is I32 range 0 .. 2**D - 1;
    subtype Valid_PK_Coeff is I32 range 0 .. 1023;
    subtype Valid_Natural_Coeff is I32 range 0 .. QM1;
    subtype Valid_Signed_Coeff is I32 range -QM1 .. QM1;
    subtype Valid_NTT_Coeff is I32 range -NTT_BOUND .. NTT_BOUND;
    subtype Valid_INTT_Coeff is I32 range -INTT_BOUND .. INTT_BOUND;
-   subtype Valid_Gamma_Coeff is I32 range -GAMMA1M1 .. GAMMA1;
+   subtype Valid_Gamma1_Coeff is I32 range -GAMMA1M1 .. GAMMA1M1;
+
+      subtype Valid_Gamma2_Coeff is I32 range -GAMMA2M1 .. GAMMA2M1;
+   subtype Valid_Eta_Coeff is I32 range -ETA .. ETA;
    subtype Hint_Coeff is I32 range 0 .. 1;
 
    subtype Packed_W1_Coeff is I32 range 0 .. ((Q - 1) / (2 * GAMMA2)) - 1;
@@ -126,6 +136,10 @@ is
    subtype Valid_SK_Poly is Poly
      with Dynamic_Predicate => (for all I in N_Index =>
           Valid_SK_Poly.Coeffs (I) in Valid_SK_Coeff);
+
+   subtype Valid_Natural_SK_Poly is Poly
+     with Dynamic_Predicate => (for all I in N_Index =>
+          Valid_Natural_SK_Poly.Coeffs (I) in Valid_Natural_SK_Coeff);
 
    subtype Valid_PK_Poly is Poly
      with Dynamic_Predicate => (for all I in N_Index =>
@@ -147,9 +161,17 @@ is
      with Dynamic_Predicate => (for all I in N_Index =>
           Valid_INTT_Poly.Coeffs (I) in Valid_INTT_Coeff);
 
-   subtype Valid_Gamma_Poly is Poly
+   subtype Valid_Gamma1_Poly is Poly
      with Dynamic_Predicate => (for all I in N_Index =>
-          Valid_Gamma_Poly.Coeffs (I) in Valid_Gamma_Coeff);
+          Valid_Gamma1_Poly.Coeffs (I) in Valid_Gamma1_Coeff);
+
+   subtype Valid_Gamma2_Poly is Poly
+     with Dynamic_Predicate => (for all I in N_Index =>
+          Valid_Gamma2_Poly.Coeffs (I) in Valid_Gamma2_Coeff);
+
+   subtype Valid_Eta_Poly is Poly
+     with Dynamic_Predicate => (for all I in N_Index =>
+          Valid_Eta_Poly.Coeffs (I) in Valid_Eta_Coeff);
 
    subtype Valid_Decomposed_V0_Poly is Poly
      with Dynamic_Predicate => (for all I in N_Index =>
@@ -192,9 +214,25 @@ is
      with Dynamic_Predicate => (for all I in L_Index =>
           Valid_Signed_Polyvec_L.Vec (I) in Valid_Signed_Poly);
 
-   subtype Valid_Gamma_Polyvec_L is Polyvec_L
+   subtype Valid_Gamma1_Polyvec_L is Polyvec_L
      with Dynamic_Predicate => (for all I in L_Index =>
-          Valid_Gamma_Polyvec_L.Vec (I) in Valid_Gamma_Poly);
+          Valid_Gamma1_Polyvec_L.Vec (I) in Valid_Gamma1_Poly);
+
+   subtype Valid_Gamma2_Polyvec_L is Polyvec_L
+     with Dynamic_Predicate => (for all I in L_Index =>
+          Valid_Gamma2_Polyvec_L.Vec (I) in Valid_Gamma2_Poly);
+
+   subtype Valid_Gamma2_Polyvec_K is Polyvec_K
+     with Dynamic_Predicate => (for all I in K_Index =>
+          Valid_Gamma2_Polyvec_K.Vec (I) in Valid_Gamma2_Poly);
+
+   subtype Valid_Eta_Polyvec_L is Polyvec_L
+     with Dynamic_Predicate => (for all I in L_Index =>
+          Valid_Eta_Polyvec_L.Vec (I) in Valid_Eta_Poly);
+
+   subtype Valid_Eta_Polyvec_K is Polyvec_K
+     with Dynamic_Predicate => (for all I in K_Index =>
+          Valid_Eta_Polyvec_K.Vec (I) in Valid_Eta_Poly);
 
    subtype Valid_Signed_Polyvec_K is Polyvec_K
      with Dynamic_Predicate => (for all I in K_Index =>
@@ -219,6 +257,10 @@ is
    subtype Valid_SK_Polyvec_K is Polyvec_K
      with Dynamic_Predicate => (for all I in K_Index =>
           Valid_SK_Polyvec_K.Vec (I) in Valid_SK_Poly);
+
+   subtype Valid_Natural_SK_Polyvec_K is Polyvec_K
+     with Dynamic_Predicate => (for all I in K_Index =>
+          Valid_Natural_SK_Polyvec_K.Vec (I) in Valid_Natural_SK_Poly);
 
    subtype Valid_PK_Polyvec_K is Polyvec_K
      with Dynamic_Predicate => (for all I in K_Index =>
@@ -245,10 +287,25 @@ is
                         SK  : in     Bytes_SK)
      with Always_Terminates, Global => null;
 
+   procedure Pack_SK (SK  :    out Bytes_SK;
+                      Rho : in     Bytes_Seed;
+                      Tr  : in     Bytes_Tr;
+                      Key : in     Bytes_Seed;
+                      T0  : in     Valid_SK_Polyvec_K;
+                      S1  : in     Valid_SK_Polyvec_L;
+                      S2  : in     Valid_SK_Polyvec_K)
+     with Always_Terminates, Global => null;
+
    procedure Unpack_PK (Rho :    out Bytes_Seed;
                         T1  :    out Valid_PK_Polyvec_K;
-                        SK  : in     Bytes_PK)
+                        PK  : in     Bytes_PK)
      with Always_Terminates, Global => null;
+
+   procedure Pack_PK (PK  :    out Bytes_PK;
+                      Rho : in     Bytes_Seed;
+                      T1  : in     Valid_PK_Polyvec_K)
+     with Always_Terminates, Global => null;
+
 
    procedure Unpack_Sig (C : out Bytes_CTilde;
                          Z : out Polyvec_L;
@@ -257,7 +314,7 @@ is
                          Sig : in Bytes_Crypto)
      with Always_Terminates,
           Global => null,
-          Post => (OK = (Z in Valid_Gamma_Polyvec_L and H in Valid_Hint_Polyvec_K)); -- RCC Stronger
+          Post => (OK = (Z in Valid_Gamma1_Polyvec_L and H in Valid_Hint_Polyvec_K)); -- RCC Stronger
 
    procedure SHAKE256 (R : out Byte_Seq;
                        D1 : in Byte_Seq)
@@ -313,8 +370,12 @@ is
                              Nonce : in     U16)
      with Always_Terminates, Global => null,
           Pre    => Nonce <= Nonce_UB,
-          Post   => V in Valid_Gamma_Polyvec_L;
+          Post   => V in Valid_Gamma1_Polyvec_L;
 
+   procedure Poly_Uniform_Eta_4x (R0, R1, R2, R3                 :    out Valid_Eta_Poly;
+                                  Seed                           : in     Bytes_Crh;
+                                  Nonce0, Nonce1, Nonce2, Nonce3 : in     U8)
+     with Always_Terminates, Global => null;
 
    subtype Reduce32_Domain_Polyvec_K is Polyvec_K
      with Dynamic_Predicate => (for all I in K_Index =>
@@ -395,7 +456,7 @@ is
                   V : in     Polyvec_L)
      with Always_Terminates, Global => null,
           Pre => (U in Valid_INTT_Polyvec_L and
-                  V in Valid_Gamma_Polyvec_L) and then -- RCC subtypes first AND THEN check overflow
+                  V in Valid_Gamma1_Polyvec_L) and then -- RCC subtypes first AND THEN check overflow
                  (for all K0 in L_Index =>
                    (for all K1 in N_Index =>
                      (U.Vec (K0).Coeffs (K1) + V.Vec (K0).Coeffs (K1)) in Reduce32_Domain)),
@@ -404,14 +465,16 @@ is
    procedure Add (U : in out Polyvec_K;
                   V : in     Polyvec_K)
      with Always_Terminates, Global => null,
-          Pre => (for all K0 in K_Index =>
-                   (for all K1 in N_Index =>
-                     I64 (U.Vec (K0).Coeffs (K1)) +
-                     I64 (V.Vec (K0).Coeffs (K1)) <= I64 (I32'Last))) and
-                 (for all K0 in K_Index =>
-                   (for all K1 in N_Index =>
-                     I64 (U.Vec (K0).Coeffs (K1)) +
-                     I64 (V.Vec (K0).Coeffs (K1)) >= I64 (I32'First)));
+          Pre => (U in Valid_INTT_Polyvec_K and V in Valid_Gamma2_Polyvec_K) and then
+                 ((for all K0 in K_Index =>
+                    (for all K1 in N_Index =>
+                      I64 (U.Vec (K0).Coeffs (K1)) +
+                      I64 (V.Vec (K0).Coeffs (K1)) <= I64 (I32'Last))) and
+                  (for all K0 in K_Index =>
+                    (for all K1 in N_Index =>
+                      I64 (U.Vec (K0).Coeffs (K1)) +
+                      I64 (V.Vec (K0).Coeffs (K1)) >= I64 (I32'First)))),
+          Post => U in Valid_Signed_Polyvec_K;
 
    procedure Sub (U : in out Polyvec_K;
                   V : in     Polyvec_K)
@@ -439,7 +502,9 @@ is
      with Global => null,
           Pre    => B >= 0 and
                     B <= (Q - 1) / 8 and
-                    V in Reduce32_Range_Polyvec_K;
+                    V in Reduce32_Range_Polyvec_K,
+          Post   => (Chknorm'Result = (for all I in K_Index =>
+                      (for all K in N_Index => (V.Vec (I).Coeffs (K) > -B and V.Vec (I).Coeffs (K) < B))));
 
 
    procedure Make_Hint (H : out Valid_Hint_Polyvec_K; -- RCC stronger
@@ -457,7 +522,7 @@ is
 
    procedure Pack_Sig (Sig : out Bytes_Crypto;
                        C   : in Bytes_Ctilde;
-                       Z   : in Valid_Gamma_Polyvec_L;
+                       Z   : in Valid_Gamma1_Polyvec_L;
                        H   : in Valid_Hint_Polyvec_K;
                        Number_Of_Hints : in U32)
      with Always_Terminates, Global => null,
@@ -469,4 +534,14 @@ is
           Global => null,
           Pre    => V in Valid_PK_Polyvec_K, -- all in 0 .. 1023 - RCC Stronger
           Post   => V in Valid_Natural_Polyvec_K; -- all in 0 .. Q-1
+
+
+   -- Polyvec_K_Power2Round
+   procedure Power2Round (V1 :    out Polyvec_K; -- unsigned in 0 .. 1023
+                          V0 :    out Polyvec_K; -- signed in -4095 .. 4096
+                          V  : in     Valid_Natural_Polyvec_K)
+     with Always_Terminates,
+          Global => null,
+          Post   => V0 in Valid_SK_Polyvec_K and
+                    V1 in Valid_PK_Polyvec_K;
 end MLDSA;

@@ -3,6 +3,104 @@ package body Sign
   with Spark_Mode => On
 is
 
+   procedure Keypair_Internal (PK   :    out Bytes_PK;
+                               SK   :    out Bytes_SK;
+                               Seed : in     Bytes_Seed)
+   is
+      KeyPair_Seed : Bytes_KeyPair_Seed;
+      Rho, Key     : Bytes_Seed;
+      Rho_Prime    : Bytes_Crh;
+      Mat          : Polyvec_Matrix;
+      S1           : Valid_Eta_Polyvec_L;
+      S1_Hat       : Polyvec_L;
+      S2           : Valid_Eta_Polyvec_K;
+      T0, T1, T2   : Polyvec_K;
+      TR           : Bytes_Tr;
+   begin
+      SHAKE256 (KeyPair_Seed, Seed & U8'(K) & U8'(L));
+
+      -- 1 .. 32
+      Rho := KeyPair_Seed (1 .. SEEDBYTES);
+
+      -- 33 .. 96
+      Rho_Prime := KeyPair_Seed (SEEDBYTES + 1 .. SEEDBYTES + CRHBYTES);
+
+      -- 97 .. 128
+      Key := KeyPair_Seed (SEEDBYTES + CRHBYTES + 1 .. KeyPair_Seed'Last);
+
+      Matrix_Expand (Mat, Rho);
+
+      -- MLDSA_MODE=3, so K=6 and L=5, so we need 11 useful
+      -- Poly's and one dummy to make up the numbers
+      declare
+         V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11 : Valid_Eta_Poly;
+         Dummy : Valid_Eta_Poly;
+      begin
+         Poly_Uniform_Eta_4x (V1,
+                              V2,
+                              V3,
+                              V4,
+                              Rho_Prime,
+                              0, 1, 2, 3);
+
+         Poly_Uniform_Eta_4x (V5,
+                              V6,
+                              V7,
+                              Dummy,
+                              Rho_Prime,
+                              4, 5, 6, 16#FF#);
+
+         Poly_Uniform_Eta_4x (V8,
+                              V9,
+                              V10,
+                              V11,
+                              Rho_Prime,
+                              7, 8, 9, 10);
+
+         S1 := Valid_Eta_Polyvec_L'(Vec => Poly_L'(V1, V2, V3, V4, V5));
+         S2 := Valid_Eta_Polyvec_K'(Vec => Poly_K'(V6, V7, V8, V9, V10, V11));
+      end;
+
+      --  Matrix-Vector multiplication
+      S1_Hat := S1;
+
+      pragma Assert (S1_Hat in Valid_Signed_Polyvec_L);
+      NTTL (S1_Hat);
+      pragma Assert (S1_Hat in Valid_NTT_Polyvec_L);
+
+      Matrix_Pointwise_Montgomery (T1, Mat, S1_Hat);
+
+      pragma Assert (T1 in Reduce32_Domain_Polyvec_K);
+      Reduce (T1);
+      pragma Assert (T1 in Reduce32_Range_Polyvec_K);
+
+      pragma Assert (T1 in Valid_Signed_Polyvec_K);
+      Inv_NTTK (T1);
+      pragma Assert (T1 in Valid_INTT_Polyvec_K);
+      pragma Assert (S2 in Valid_Eta_Polyvec_K);
+
+      --  Add error vector S2
+      -- T1 in -4_211_138 .. 4_211_138
+      -- S2 in -4 .. 4
+      Add (T1, S2);
+
+      --  Extract T1 and write public key
+      pragma Assert (T1 in Valid_Signed_Polyvec_K);
+      CAddQ (T1);
+      pragma Assert (T1 in Valid_Natural_Polyvec_K);
+
+      Power2Round (T2, T0, T1); -- RCC de-alias
+      pragma Assert (T2 in Valid_PK_Polyvec_K);
+      pragma Assert (T0 in Valid_SK_Polyvec_K);
+
+      Pack_PK (PK, Rho, T2);
+      SHAKE256 (Tr, PK);
+
+      pragma Assert (T0 in Valid_SK_Polyvec_K);
+      Pack_SK (SK, Rho, Tr, Key, T0, S1, S2);
+   end Keypair_Internal;
+
+
    procedure Signature_Internal (Sig    :    out Bytes_Crypto;
                                  M      : in     Byte_Seq;
                                  Prefix : in     Byte_Seq;
@@ -71,7 +169,7 @@ is
          if Chknorm (Z, GAMMA1 - BETA) then
 
             -- If Z is OK, then it meets the pre-condition of Pack_Sig()
-            pragma Assert (Z in Valid_Gamma_Polyvec_L);
+            pragma Assert (Z in Valid_Gamma1_Polyvec_L);
 
             Pointwise_Poly_Montgomery (H, CP, S2);
             Inv_NTTK (H);
@@ -86,6 +184,10 @@ is
                Inv_NTTK (H);
                Reduce (H);
                if Chknorm (H, GAMMA2) then
+
+                  pragma Assert (W0 in Valid_Gamma2_Polyvec_K);
+                  pragma Assert (H  in Valid_Gamma2_Polyvec_K);
+                  --  All coeffs in -261887 .. 261887
                   Add (W0, H);
                   Make_Hint (H, Num_Hints, W0, W2);
                   if Num_Hints <= Omega then
@@ -127,7 +229,7 @@ is
       Unpack_Sig (C, Z, H, Sig_OK, Sig);
       if Sig_OK then
 
-         pragma Assert (Z in Valid_Gamma_Polyvec_L);
+         pragma Assert (Z in Valid_Gamma1_Polyvec_L);
          pragma Assert (H in Valid_Hint_Polyvec_K);
 
          if Chknorm (Z, GAMMA1 - BETA) then
