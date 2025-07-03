@@ -325,7 +325,7 @@ is
           Reduce32_Range_Polyvec_K.Vec (I) in Reduce32_Range_Poly);
 
    procedure Matrix_Pointwise_Montgomery
-      (T   :    out Reduce32_Domain_Polyvec_K; -- RCC stronger
+      (T   :    out Valid_Signed_Polyvec_K; -- RCC Updated
        Mat : in     Polyvec_Matrix;
        V   : in     Valid_NTT_Polyvec_L)
      with Always_Terminates, Global => null;
@@ -394,19 +394,12 @@ is
    procedure Add (U : in out Polyvec_L;
                   V : in     Polyvec_L)
      with Always_Terminates, Global => null,
-          Pre => (for all K0 in L_Index => -- RCC stronger
+          Pre => (U in Valid_INTT_Polyvec_L and
+                  V in Valid_Gamma_Polyvec_L) and then -- RCC subtypes first AND THEN check overflow
+                 (for all K0 in L_Index =>
                    (for all K1 in N_Index =>
                      (U.Vec (K0).Coeffs (K1) + V.Vec (K0).Coeffs (K1)) in Reduce32_Domain)),
-          Post => U in Reduce32_Domain_Polyvec_L; -- RCC stronger
-
---          Pre => (for all K0 in L_Index =>
---                   (for all K1 in N_Index =>
---                     I64 (U.Vec (K0).Coeffs (K1)) +
---                     I64 (V.Vec (K0).Coeffs (K1)) <= I64 (I32'Last))) and
---                 (for all K0 in L_Index =>
---                   (for all K1 in N_Index =>
---                     I64 (U.Vec (K0).Coeffs (K1)) +
---                     I64 (V.Vec (K0).Coeffs (K1)) >= I64 (I32'First)));
+          Post => U in Reduce32_Domain_Polyvec_L;
 
    procedure Add (U : in out Polyvec_K;
                   V : in     Polyvec_K)
@@ -420,24 +413,15 @@ is
                      I64 (U.Vec (K0).Coeffs (K1)) +
                      I64 (V.Vec (K0).Coeffs (K1)) >= I64 (I32'First)));
 
-   procedure Sub (U : in out Polyvec_K; -- RCC
+   procedure Sub (U : in out Polyvec_K;
                   V : in     Polyvec_K)
      with Always_Terminates, Global => null,
-          Pre => (for all K0 in L_Index => -- RCC stronger
+          Pre => (U in Valid_Signed_Polyvec_K and
+                  V in Valid_Signed_Polyvec_K) and then
+                 (for all K0 in L_Index =>
                    (for all K1 in N_Index =>
                      (U.Vec (K0).Coeffs (K1) - V.Vec (K0).Coeffs (K1)) in Reduce32_Domain)),
-          Post => U in Reduce32_Domain_Polyvec_K; -- RCC stronger
-
---          Pre => (for all K0 in K_Index =>
---                   (for all K1 in N_Index =>
---                     I64 (U.Vec (K0).Coeffs (K1)) -
---                     I64 (V.Vec (K0).Coeffs (K1)) <= I64 (I32'Last))) and
---                 (for all K0 in K_Index =>
---                   (for all K1 in N_Index =>
---                     I64 (U.Vec (K0).Coeffs (K1)) -
---                     I64 (V.Vec (K0).Coeffs (K1)) >= I64 (I32'First)));
-
-
+          Post => U in Reduce32_Domain_Polyvec_K;
 
    --  True means V is OK
    function Chknorm (V : in Polyvec_L;
@@ -469,7 +453,7 @@ is
    procedure Use_Hint (W :    out Valid_Decomposed_V1_Polyvec_K;
                        V : in     Valid_Natural_Polyvec_K;
                        H : in     Valid_Hint_Polyvec_K)
-     with Global => null;
+     with Always_Terminates, Global => null;
 
    procedure Pack_Sig (Sig : out Bytes_Crypto;
                        C   : in Bytes_Ctilde;

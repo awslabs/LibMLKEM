@@ -75,6 +75,9 @@ is
 
             Pointwise_Poly_Montgomery (H, CP, S2);
             Inv_NTTK (H);
+
+            pragma Assert (W0 in Valid_Decomposed_V0_Polyvec_K);
+            pragma Assert (H in Valid_INTT_Polyvec_K);
             Sub (W0, H);
             Reduce (W0);
 
@@ -116,6 +119,7 @@ is
       CP  : Poly;
       Mat : Polyvec_Matrix;
       W1  : Reduce32_Domain_Polyvec_K;
+      W2  : Valid_Decomposed_V1_Polyvec_K;
 
       Buf : Bytes_Packed_W1;
    begin
@@ -145,35 +149,22 @@ is
             Matrix_Pointwise_Montgomery (W1, Mat, Z);
 
             -- All Coeffs in W1 should be result of a montgomery_reduce()
-
---            pragma Assert (CP in Challenge_Poly);
---            pragma Assert (CP in Valid_Signed_Poly);
-
             NTT (CP);
 
---            pragma Assert (T1 in Valid_PK_Polyvec_K); -- OK all in 0 .. 1023
             ShiftL (T1);
-
---            pragma Assert (T1 in Valid_Natural_Polyvec_K);
---            pragma Assert (T1 in Valid_Signed_Polyvec_K);
             NTTK (T1);
-
             Pointwise_Poly_Montgomery (T2, CP, T1); -- RCC de-alias
 
-            -- All T2 in -QM1 .. QM1
-            pragma Assert (T2 in Valid_Signed_Polyvec_K); -- from above
-
-            -- All W1 coeffs in I32'First .. REDUCE32_DOMAIN_MAX;
-            -- REDUCE32_DOMAIN_MAX = (I32'Last - (2 ** 22) - 1);
-            pragma Assert (W1 in Reduce32_Domain_Polyvec_K);
-
+            pragma Assert (W1 in Valid_Signed_Polyvec_K);
+            pragma Assert (T2 in Valid_Signed_Polyvec_K);
             Sub (W1, T2);
             Reduce (W1);
+
             Inv_NTTK (W1);
 
             CAddQ (W1);
-            Use_Hint (W1, W1, H);
-            Pack_W1 (Buf, W1);
+            Use_Hint (W2, W1, H); -- RCC de-alias
+            Pack_W1 (Buf, W2);
 
             SHAKE256 (C2, Mu, Buf);
 
