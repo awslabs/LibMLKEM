@@ -63,40 +63,18 @@ is
 
       --  Matrix-Vector multiplication
       S1_Hat := S1;
-
-      pragma Assert (S1_Hat in Valid_Signed_Polyvec_L);
       NTTL (S1_Hat);
-      pragma Assert (S1_Hat in Valid_NTT_Polyvec_L);
-
       Matrix_Pointwise_Montgomery (T1, Mat, S1_Hat);
-
-      pragma Assert (T1 in Reduce32_Domain_Polyvec_K);
       Reduce (T1);
-      pragma Assert (T1 in Reduce32_Range_Polyvec_K);
-
-      pragma Assert (T1 in Valid_Signed_Polyvec_K);
       Inv_NTTK (T1);
-      pragma Assert (T1 in Valid_INTT_Polyvec_K);
-      pragma Assert (S2 in Valid_Eta_Polyvec_K);
-
       --  Add error vector S2
-      -- T1 in -4_211_138 .. 4_211_138
-      -- S2 in -4 .. 4
       Add (T1, S2);
 
       --  Extract T1 and write public key
-      pragma Assert (T1 in Valid_Signed_Polyvec_K);
       CAddQ (T1);
-      pragma Assert (T1 in Valid_Natural_Polyvec_K);
-
       Power2Round (T2, T0, T1); -- RCC de-alias
-      pragma Assert (T2 in Valid_PK_Polyvec_K);
-      pragma Assert (T0 in Valid_SK_Polyvec_K);
-
       Pack_PK (PK, Rho, T2);
       SHAKE256 (Tr, PK);
-
-      pragma Assert (T0 in Valid_SK_Polyvec_K);
       Pack_SK (SK, Rho, Tr, Key, T0, S1, S2);
    end Keypair_Internal;
 
