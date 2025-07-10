@@ -80,6 +80,7 @@ is
 
 
    procedure Signature_Internal (Sig    :    out Bytes_Crypto;
+                                 OK     :    out Boolean;
                                  M      : in     Byte_Seq;
                                  Prefix : in     Byte_Seq;
                                  Rnd    : in     Bytes_Rnd;
@@ -103,6 +104,7 @@ is
       Nonce     : U16;
       Num_Hints : U32;
    begin
+      OK := True;
       Nonce := 0;
       Unpack_SK (Rho, Tr, Key, T0, S1, S2, SK);
       if ExtMu then
@@ -119,6 +121,12 @@ is
 
       loop
          pragma Loop_Invariant (Nonce <= Nonce_UB);
+         if Nonce = Nonce_UB then
+            Sig := (others => 0);
+            OK  := False;
+            return;
+         end if;
+
          Uniform_Gamma1 (Y, RhoPrime, Nonce);
          Nonce := Nonce + 1;
 
@@ -176,7 +184,6 @@ is
             end if;
          end if;
       end loop;
-
    end Signature_Internal;
 
    function Verify_Internal (Sig    : in Bytes_Crypto;

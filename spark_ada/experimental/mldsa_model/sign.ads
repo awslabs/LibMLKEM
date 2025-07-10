@@ -9,6 +9,7 @@ is
      with Global => null;
 
    procedure Signature_Internal (Sig    :    out Bytes_Crypto;
+                                 OK     :    out Boolean;
                                  M      : in     Byte_Seq;
                                  Prefix : in     Byte_Seq;
                                  Rnd    : in     Bytes_Rnd;
