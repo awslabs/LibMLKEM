@@ -69,7 +69,7 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
 {
   for j in iter: start .. start + len
 
-// These invariant terms repeat the pre-condition regarding bound and zeta.
+// These invariant terms repeat the pre-condition regarding start, len, bound and zeta.
 // These are only needed if verifier::loop_isolation(true) is enabled.
 // If verifier::loop_isolation(false) (as above), then these terms are
 // inferred from the pre-condition, iterator specification, and context.
