@@ -68,7 +68,6 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
            forall|i:int| start + 2 * len <= i < N ==> r[i] < bound,
 {
   for j in iter: start .. start + len
-
 // These invariant terms repeat the pre-condition regarding start, len, bound and zeta.
 // These are only needed if verifier::loop_isolation(true) is enabled.
 // If verifier::loop_isolation(false) (as above), then these terms are
@@ -100,5 +99,33 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
 }
 
 
+#[verifier::loop_isolation(false)]
+fn ntt_layer (r : &mut Poly, layer : i16)
+  requires 1 <= layer <= 7,
+           forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < old(r)[i],
+           forall|i:int| 0 <= i < N ==> old(r)[i] < (layer * (Q as i16)),
+  ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < old(r)[i],
+           forall|i:int| 0 <= i < N ==> old(r)[i] < ((layer + 1) * (Q as i16)),
+{
+  let k   : usize = 1 << (layer - 1);
+  let len : usize = N >> layer;
+
+  assert(1 <= k <= 64) by (bit_vector)
+    requires 1 <= layer <= 7;
+
+  assert(2 <= len <= 128) by (bit_vector)
+    requires 1 <= layer <= 7;
+
+  let mut start : usize = 0;
+
+  while (start < N)
+    invariant 1 <= layer <= 7,
+    decreases N - start,
+  {
+    ntt_butterfly_block(r, 20, start, len, layer * (Q as i16));
+    start += 2 * len;
+  }
+
+}
 
 } // verus!
