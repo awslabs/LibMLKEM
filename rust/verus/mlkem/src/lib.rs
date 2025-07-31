@@ -44,6 +44,8 @@ fn montgomery_reduce (a : i32) -> (r : i16)
   let a_reduced  : u16 = #[verifier::truncate] ((a & U16_MAX_AS_I32) as u16);
   let a_inverted : u16 = #[verifier::truncate] ((((a_reduced as u32) * QINV) & U16_MAX_AS_U32) as u16);
 
+  // Q1: does [verifier:truncate] impact soundness? What are the semantics of u16 -> i16
+  // conversion anyway?
   let t : i16 = #[verifier::truncate] (a_inverted as i16);
 
   let r : i32 = a - ((t as i32) * Q);
@@ -79,6 +81,7 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
            0 <= bound < i16::MAX - Q as i16,
            -HALF_Q < zeta < HALF_Q,
 
+           // Q2: why old(r) here in the requires clause?
            forall|i:int| 0 <= i < start ==> -(bound + Q) < old(r)[i],
            forall|i:int| 0 <= i < start ==> old(r)[i] < bound + Q,
 
@@ -130,6 +133,7 @@ fn ntt_layer (r : &mut Poly, layer : i16)
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < r[i],
            forall|i:int| 0 <= i < N ==> r[i] < ((layer + 1) * (Q as i16)),
 {
+  // Q3
   // Compute len and prove 2 <= len <= 128.
   // This all seems a bit long-winded. Is there an easier way?
   let ul : u16 = layer as u16;
@@ -139,15 +143,13 @@ fn ntt_layer (r : &mut Poly, layer : i16)
   let len : usize = N >> ul;
   assert(2 <= len <= 128);
 
-
   // Compute k and prove 1 <= k <= 64.
-  // This all seems a bit long-winded. Is there an easier way?
-  let ul1 : usize = (layer - 1) as usize;
+  let ul1 : usize = (7 - layer) as usize;
   assert(0 <= ul1 <= 6);
-  assert(1 <= (1 << ul1) <= 64) by (bit_vector)
+  assert(1 <= (64 >> ul1) <= 64) by (bit_vector)
     requires 0 <= ul1 <= 6;
 
-  let mut k : usize = 1 << ul1;
+  let mut k : usize = 64 >> ul1;
   assert(1 <= k <= 64); // Proof fails here!
 
   let mut start : usize = 0;
