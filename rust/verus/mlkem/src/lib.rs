@@ -55,6 +55,7 @@ fn montgomery_reduce (a : i32) -> (r : i16)
   assert (r == a - ((t as i32) * Q));
   assert (result == r >> 16);
 
+  // Q2: Help! How can I get these to prove?
   assert (result < Q);  // Can't prove this yet
   assert (result > -Q); // Can't prove this yet
   return result as i16;
@@ -81,7 +82,7 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
            0 <= bound < i16::MAX - Q as i16,
            -HALF_Q < zeta < HALF_Q,
 
-           // Q2: why old(r) here in the requires clause?
+           // Q3: why old(r) here in the requires clause?
            forall|i:int| 0 <= i < start ==> -(bound + Q) < old(r)[i],
            forall|i:int| 0 <= i < start ==> old(r)[i] < bound + Q,
 
@@ -133,8 +134,7 @@ fn ntt_layer (r : &mut Poly, layer : i16)
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < r[i],
            forall|i:int| 0 <= i < N ==> r[i] < ((layer + 1) * (Q as i16)),
 {
-  // Q3
-  // Compute len and prove 2 <= len <= 128.
+  // Q4: Compute len and prove 2 <= len <= 128.
   // This all seems a bit long-winded. Is there an easier way?
   let ul : u16 = layer as u16;
   assert(1 <= ul <= 7);
