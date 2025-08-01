@@ -1,6 +1,6 @@
 use vstd::prelude::*;
-//use vstd::bits::lemma_u16_shr_is_div;
-//use vstd::arithmetic::power2::*;
+use vstd::bits::*;
+use vstd::arithmetic::power2::*;
 
 verus! {
 
@@ -146,13 +146,19 @@ fn ntt_layer (r : &mut Poly, layer : i16)
            forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
 {
+  broadcast use lemma_u16_shr_is_div;
+
   // Q4: Compute len and prove 2 <= len <= 128.
   // This all seems a bit long-winded. Is there an easier way?
   let ul : u16 = layer as u16;
   assert(1 <= ul <= 7);
   assert(2 <= (256 >> ul) <= 128) by (bit_vector)
     requires 1 <= ul <= 7;
+
   let len : usize = N >> ul;
+
+  assert(len == 256 as nat / pow2(ul as nat)); // Trigger lemma
+
   assert(2 <= len <= 128);
 
   // Compute k and prove 1 <= k <= 64.
@@ -164,9 +170,9 @@ fn ntt_layer (r : &mut Poly, layer : i16)
   let mut k : usize = 64 >> ul1;
   assert(1 <= k <= 64); // Proof fails here!
 
+
+
   let mut start : usize = 0;
-
-
 //  assert(len * k == 128) by (nonlinear_arith);
 
 //  assert(start + 2 * len <= N);
@@ -192,6 +198,22 @@ fn ntt_layer (r : &mut Poly, layer : i16)
     k += 1;
     start += 2 * len;
   }
+
+}
+
+fn clen (layer : i16) -> (len : usize)
+  requires 1 <= layer <= 7,
+  ensures 2 <= len <= 128,
+          len as nat == pow2((8 - layer) as nat),
+{
+  broadcast use lemma_u16_shl_is_mul;
+
+  let ul : usize = (8 - layer as usize);
+  assert (1 <= ul <= 7);
+  let r : usize = 1 << ul;
+  assert (r as nat == 1 * pow2(ul as nat)); // using lemma_u16_shl_is_mul;
+
+  return r;
 
 }
 
