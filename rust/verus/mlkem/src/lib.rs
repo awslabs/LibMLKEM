@@ -1,6 +1,8 @@
-use vstd::prelude::*;
-use vstd::bits::*;
+use vstd::arithmetic::power::*;
 use vstd::arithmetic::power2::*;
+use vstd::bits::*;
+use vstd::calc_macro::calc;
+use vstd::prelude::*;
 
 verus! {
 
@@ -201,20 +203,52 @@ fn ntt_layer (r : &mut Poly, layer : i16)
 
 }
 
+// TODO: move to vstd::arithmetic::power2
+proof fn lemma_pow2_increases(e1: nat, e2: nat)
+    requires
+        e1 <= e2,
+    ensures
+        pow2(e1) <= pow2(e2),
+{
+    lemma_pow2(e1);
+    lemma_pow2(e2);
+    lemma_pow_increases(2, e1, e2);
+}
+
+// TODO: move to vstd::bits
+proof fn lemma_u64_one_shl_is_pow2(shift: u64)
+    requires
+        0 <= shift < u64::BITS,
+        pow2(shift as nat) <= u64::MAX,
+    ensures
+        1u64 << shift == pow2(shift as nat) as u64,
+{
+  let x = 1u64;
+  assert((x << shift) == x * pow2(shift as nat)) by {
+    lemma_u64_shl_is_mul(x, shift);
+  };
+}
+
 fn clen (layer : i16) -> (len : usize)
   requires 1 <= layer <= 7,
   ensures 2 <= len <= 128,
           len as nat == pow2((8 - layer) as nat),
 {
-  broadcast use lemma_u16_shl_is_mul;
-
-  let ul : usize = (8 - layer as usize);
+  let ul : u64 = (8 - layer as u64);
   assert (1 <= ul <= 7);
-  let r : usize = 1 << ul;
-  assert (r as nat == 1 * pow2(ul as nat)); // using lemma_u16_shl_is_mul;
+  let r : u64 = 1 << ul;
 
-  return r;
+  assert(2 <= pow2(ul as nat) <= 128) by {
+    lemma_pow2_increases(1, ul as nat);
+    lemma_pow2_increases(ul as nat, 7);
+    lemma2_to64();
+  };
 
+  assert (r == pow2(ul as nat)) by {
+    lemma_u64_one_shl_is_pow2(ul as u64);
+  };
+
+  r as usize
 }
 
 } // verus!
