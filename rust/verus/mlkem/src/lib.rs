@@ -37,16 +37,40 @@ const Zetas : ZetaTable =
   ];
 
 
+// Verus can't directly model the semantics of u16 -> i16 conversion
+// at the moment, so we wrap these conversions in a function with
+// suitable postcondition for now..
+fn u16toi16 (x : u16) -> (r : i16)
+  ensures (x <= 32767) ==> (r == x),
+          (x > 32768)  ==> (r == ((x as i32) - 65536i32) as i16)
+{
+  return #[verifier::truncate] (x as i16);
+}
+
+// Ditto for i32 to u16 conversion
+fn i32tou16 (x : i32) -> (r : u16)
+  ensures r == x & 0xFFFF,
+          0 <= r <= u16::MAX,
+{
+  return #[verifier::truncate] (x as u16);
+}
+
+// Ditto for u32 to u16 conversion
+fn u32tou16 (x : u32) -> (r : u16)
+  ensures r == x & 0xFFFF,
+          0 <= r <= u16::MAX,
+{
+  return #[verifier::truncate] (x as u16);
+}
+
 fn montgomery_reduce (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
 {
-  let a_reduced  : u16 = #[verifier::truncate] ((a & U16_MAX_AS_I32) as u16);
-  let a_inverted : u16 = #[verifier::truncate] ((((a_reduced as u32) * QINV) & U16_MAX_AS_U32) as u16);
+  let a_reduced  : u16 = i32tou16 (a);
+  let a_inverted : u16 = u32tou16 ((a_reduced as u32) * QINV);
 
-  // Q1: does [verifier:truncate] impact soundness? What are the semantics of u16 -> i16
-  // conversion anyway?
-  let t : i16 = #[verifier::truncate] (a_inverted as i16);
+  let t : i16 = u16toi16 (a_inverted);
 
   let r : i32 = a - ((t as i32) * Q);
 
@@ -83,18 +107,14 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
            -HALF_Q < zeta < HALF_Q,
 
            // Q3: why old(r) here in the requires clause?
-           forall|i:int| 0 <= i < start ==> -(bound + Q) < old(r)[i],
-           forall|i:int| 0 <= i < start ==> old(r)[i] < bound + Q,
+           forall|i:int| 0 <= i < start ==> -(bound + Q) < #[trigger] old(r)[i] < bound + Q,
+           forall|i:int| start <= i < N ==> -bound < #[trigger] old(r)[i] < bound,
 
-           forall|i:int| start <= i < N ==> -bound < old(r)[i],
-           forall|i:int| start <= i < N ==> old(r)[i] < bound,
-
-  ensures  forall|i:int| 0 <= i < start + 2 * len ==> -(bound + Q) < r[i],
-           forall|i:int| 0 <= i < start + 2 * len ==> r[i] < bound + Q,
-           forall|i:int| start + 2 * len <= i < N ==> -bound < r[i],
-           forall|i:int| start + 2 * len <= i < N ==> r[i] < bound,
+  ensures  forall|i:int| 0 <= i < start + 2 * len ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
+           forall|i:int| start + 2 * len <= i < N ==> -bound < #[trigger] r[i] < bound,
 {
   for j in iter: start .. start + len
+
 // These invariant terms repeat the pre-condition regarding start, len, bound and zeta.
 // These are only needed if verifier::loop_isolation(true) is enabled.
 // If verifier::loop_isolation(false) (as above), then these terms are
@@ -108,16 +128,10 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
 //              start <= j <= start + len,  // j       == start + len just before loop exit
 //              j + len <= N,               // j + len == N           just before loop exit
 
-              // Upper and lower bounds on r[i] are split here otherwise
-              // Verus can't find the trigger automatically...
-    invariant forall|i:int| 0 <= i < j ==> -(bound + Q) < r[i],
-              forall|i:int| 0 <= i < j ==> r[i] < bound + Q,
-              forall|i:int| j <= i < start + len ==> -bound < r[i],
-              forall|i:int| j <= i < start + len ==> r[i] < bound,
-              forall|i:int| start + len <= i < j + len ==> -(bound + Q) < r[i],
-              forall|i:int| start + len <= i < j + len ==> r[i] < bound + Q,
-              forall|i:int| j + len <= i < N ==> -bound < r[i],
-              forall|i:int| j + len <= i < N ==> r[i] < bound,
+    invariant forall|i:int| 0 <= i < j ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
+              forall|i:int| j <= i < start + len ==> -bound < #[trigger] r[i] < bound,
+              forall|i:int| start + len <= i < j + len ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
+              forall|i:int| j + len <= i < N ==> -bound < #[trigger] r[i] < bound,
   {
      let t : i16 = fqmul(r[j + len], zeta);
      r[j + len] = r[j] - t;
@@ -129,10 +143,8 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
 #[verifier::loop_isolation(false)]
 fn ntt_layer (r : &mut Poly, layer : i16)
   requires 1 <= layer <= 7,
-           forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < old(r)[i],
-           forall|i:int| 0 <= i < N ==> old(r)[i] < (layer * (Q as i16)),
-  ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < r[i],
-           forall|i:int| 0 <= i < N ==> r[i] < ((layer + 1) * (Q as i16)),
+           forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
+  ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
 {
   // Q4: Compute len and prove 2 <= len <= 128.
   // This all seems a bit long-winded. Is there an easier way?
@@ -154,15 +166,25 @@ fn ntt_layer (r : &mut Poly, layer : i16)
 
   let mut start : usize = 0;
 
+
+//  assert(len * k == 128) by (nonlinear_arith);
+
+//  assert(start + 2 * len <= N);
+
+  // Q5: Why does "256" here work ok, but "N" not OK?
+  assert(2 * len * k == start + 256) by (bit_vector)
+    requires 1 <= layer <= 7,
+             len == 256 >> (layer as u16),
+             k == 64 >> (7 - layer) as usize,
+             start == 0;
+
   while (start < N && k < N / 2)
     invariant 1 <= layer <= 7,
               start < N + 2 * len,
               k <= N / 2,
               2 * len * k == start + N,
-              forall|i:int| 0 <= i < start ==> (-(layer + 1) * (Q as i16)) < r[i],
-              forall|i:int| 0 <= i < start ==> r[i] < ((layer + 1) * (Q as i16)),
-              forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < r[i],
-              forall|i:int| start <= i < N ==> r[i] < (layer * (Q as i16)),
+              forall|i:int| 0 <= i < start ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
+              forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < (layer * (Q as i16)),
     decreases N - start,
   {
     let zeta : i16 = Zetas[k];
