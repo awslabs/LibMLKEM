@@ -1,7 +1,7 @@
 use vstd::arithmetic::power::*;
 use vstd::arithmetic::power2::*;
 use vstd::bits::*;
-use vstd::calc_macro::calc;
+//use vstd::calc_macro::calc;
 use vstd::prelude::*;
 
 verus! {
@@ -142,67 +142,6 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, b
 }
 
 
-#[verifier::loop_isolation(false)]
-fn ntt_layer (r : &mut Poly, layer : i16)
-  requires 1 <= layer <= 7,
-           forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
-  ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
-{
-  broadcast use lemma_u16_shr_is_div;
-
-  // Q4: Compute len and prove 2 <= len <= 128.
-  // This all seems a bit long-winded. Is there an easier way?
-  let ul : u16 = layer as u16;
-  assert(1 <= ul <= 7);
-  assert(2 <= (256 >> ul) <= 128) by (bit_vector)
-    requires 1 <= ul <= 7;
-
-  let len : usize = N >> ul;
-
-  assert(len == 256 as nat / pow2(ul as nat)); // Trigger lemma
-
-  assert(2 <= len <= 128);
-
-  // Compute k and prove 1 <= k <= 64.
-  let ul1 : usize = (7 - layer) as usize;
-  assert(0 <= ul1 <= 6);
-  assert(1 <= (64 >> ul1) <= 64) by (bit_vector)
-    requires 0 <= ul1 <= 6;
-
-  let mut k : usize = 64 >> ul1;
-  assert(1 <= k <= 64); // Proof fails here!
-
-
-
-  let mut start : usize = 0;
-//  assert(len * k == 128) by (nonlinear_arith);
-
-//  assert(start + 2 * len <= N);
-
-  // Q5: Why does "256" here work ok, but "N" not OK?
-  assert(2 * len * k == start + 256) by (bit_vector)
-    requires 1 <= layer <= 7,
-             len == 256 >> (layer as u16),
-             k == 64 >> (7 - layer) as usize,
-             start == 0;
-
-  while (start < N && k < N / 2)
-    invariant 1 <= layer <= 7,
-              start < N + 2 * len,
-              k <= N / 2,
-              2 * len * k == start + N,
-              forall|i:int| 0 <= i < start ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
-              forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < (layer * (Q as i16)),
-    decreases N - start,
-  {
-    let zeta : i16 = Zetas[k];
-    ntt_butterfly_block(r, zeta, start, len, layer * (Q as i16));
-    k += 1;
-    start += 2 * len;
-  }
-
-}
-
 // TODO: move to vstd::arithmetic::power2
 proof fn lemma_pow2_increases(e1: nat, e2: nat)
     requires
@@ -250,5 +189,90 @@ fn clen (layer : i16) -> (len : usize)
 
   r as usize
 }
+
+fn ck (layer : i16) -> (k : usize)
+  requires 1 <= layer <= 7,
+  ensures 1 <= k <= 64,
+          k as nat == pow2((layer - 1) as nat),
+{
+  let ul : u64 = ((layer - 1) as u64);
+  assert (0 <= ul <= 6);
+  let r : u64 = 1 << ul;
+
+  assert(1 <= pow2(ul as nat) <= 64) by {
+    lemma_pow2_increases(0, ul as nat);
+    lemma_pow2_increases(ul as nat, 6);
+    lemma2_to64();
+  };
+
+  assert (r == pow2(ul as nat)) by {
+    lemma_u64_one_shl_is_pow2(ul as u64);
+  };
+
+  r as usize
+}
+
+
+
+#[verifier::loop_isolation(false)]
+fn ntt_layer (r : &mut Poly, layer : i16)
+  requires 1 <= layer <= 7,
+           forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
+  ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
+{
+  broadcast use lemma_u64_shl_is_mul;
+  broadcast use lemma_pow2_adds;
+
+  let     len : usize = clen (layer);
+  let mut k   : usize = ck (layer);
+
+  assert(2 <= len <= 128);
+  assert(1 <= k <= 64);
+
+  // It helps to know that len * k == 128.
+  // Using the pow2 and bits lemmas, this all seems a bit long-winded.
+  // Is there an easier and more elegant way?
+  assert(len as nat == pow2((8 - layer) as nat));
+  assert(k   as nat == pow2((layer - 1) as nat));
+  assert((len as nat) * (k as nat) == pow2((8 - layer) as nat) * pow2((layer - 1) as nat));
+  assert(pow2((8 - layer) as nat) * pow2((layer - 1) as nat) == pow2((8 - layer) as nat + (layer - 1) as nat));
+  assert((8 - layer) as nat + (layer - 1) as nat == 7);
+  assert(pow2((8 - layer) as nat) * pow2((layer - 1) as nat) == pow2(7));
+  assert((len as nat) * (k as nat) == pow2(7));
+  assert(pow2(7) == 128) by { lemma2_to64() };
+  assert((len as nat) * (k as nat) == 128);
+  // At last!
+  assert(len * k == 128);
+
+  let mut start : usize = 0;
+
+  // Q5: Why does "256" here work ok, but "N" not OK?
+  assert(2 * len * k == start + 256) by (nonlinear_arith)
+    requires len * k == 128,
+             start == 0;
+
+  while (start + 2 * len <= N)
+    invariant 1 <= layer <= 7,
+              start < N + 2 * len,
+              k <= N / 2,
+              2 * len * k == start + N,
+              forall|i:int| 0 <= i < start ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
+              forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < (layer * (Q as i16)),
+    decreases N - start,
+  {
+    let zeta : i16 = Zetas[k];
+    ntt_butterfly_block(r, zeta, start, len, layer * (Q as i16));
+
+    // Adding 1 to k, and 2*len to start maintains the loop invariant,
+    // but we need nonlinear_arith to establish that result, so...
+    assert(2 * len * (k + 1) == (start + 2 * len) + N) by (nonlinear_arith)
+      requires 2 * len * k == start + N;
+
+    k += 1;
+    start += 2 * len;
+  }
+
+}
+
 
 } // verus!
