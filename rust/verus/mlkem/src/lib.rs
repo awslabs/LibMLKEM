@@ -6,10 +6,11 @@ use vstd::prelude::*;
 
 verus! {
 
-const N      : usize = 256;
-const Q      : i32 = 3329;
-const HALF_Q : i32 = 1665;
-const QINV   : u32 = 62209;
+const N         : usize = 256;
+const Q         : i32 = 3329;
+const HALF_Q    : i32 = 1665;
+const QINV      : u32 = 62209;
+const NTT_BOUND : i32 = Q * 8;
 
 const U16_MAX_AS_I32 : i32 = u16::MAX as i32;
 const U16_MAX_AS_U32 : u32 = u16::MAX as u32;
@@ -272,6 +273,19 @@ fn ntt_layer (r : &mut Poly, layer : i16)
     start += 2 * len;
   }
 
+}
+
+
+#[verifier::loop_isolation(false)]
+fn poly_ntt (r : &mut Poly)
+  requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
+  ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
+{
+  for layer in 1i16 .. 8
+    invariant forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < layer * (Q as i16),
+  {
+    ntt_layer(r, layer);
+  }
 }
 
 
