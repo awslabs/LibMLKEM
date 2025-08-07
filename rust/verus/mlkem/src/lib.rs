@@ -147,10 +147,10 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _
 //              start <= j <= start + len,  // j       == start + len just before loop exit
 //              j + len <= N,               // j + len == N           just before loop exit
 
-    invariant forall|i:int| 0 <= i < j ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
-              forall|i:int| j <= i < start + len ==> -bound < #[trigger] r[i] < bound,
-              forall|i:int| start + len <= i < j + len ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
-              forall|i:int| j + len <= i < N ==> -bound < #[trigger] r[i] < bound,
+    invariant forall|i:int| 0 <= i < j ==> -(_bound + Q) < #[trigger] r[i] < _bound + Q,
+              forall|i:int| j <= i < start + len ==> -_bound < #[trigger] r[i] < _bound,
+              forall|i:int| start + len <= i < j + len ==> -(_bound + Q) < #[trigger] r[i] < _bound + Q,
+              forall|i:int| j + len <= i < N ==> -_bound < #[trigger] r[i] < _bound,
   {
      let t : i16 = fqmul(r[j + len], zeta);
      r[j + len] = r[j] - t;
@@ -289,6 +289,30 @@ fn ntt_layer (r : &mut Poly, layer : i16)
     start += 2 * len;
   }
 
+}
+
+const TWO25 : i32 = 33554432;
+const MAGIC : i32 = 20159; // floor(2**26/Q)
+
+fn barrett_reduce(a : i16) -> (r : i16)
+  ensures -HALF_Q < r < HALF_Q
+{
+  let t  : i32 = MAGIC * a as i32;
+  assert(i16::MIN as i32 * MAGIC <= t <= i16::MAX as i32 * MAGIC) by (compute);
+
+  let t2 : i32 = t + TWO25;
+  assert((i16::MIN as i32 * MAGIC) + TWO25 <= t2 <= (i16::MAX as i32 * MAGIC) + TWO25);
+
+  // Verus seems to get lost here...
+  let t3 : i32 = t2 >> 26;
+
+  assert(-10 <= t3); // So this doesn't prove
+  assert(t3 <= 10);  // and nor does this
+
+  // if t3 bounded by +/-10 then t3 * Q needs to be evaluated in 32-bits
+  let t4 : i32 = a as i32 - t3 * Q;
+  let t5 : i16 = t4 as i16;
+  return t5;
 }
 
 
