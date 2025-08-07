@@ -1,16 +1,29 @@
-use vstd::arithmetic::power::*;
-use vstd::arithmetic::power2::*;
-use vstd::bits::*;
-//use vstd::calc_macro::calc;
 use vstd::prelude::*;
 
 verus! {
+
+#[cfg(verus_keep_ghost)]
+use vstd::{
+
+    //arithmetic::mul::lemma_mul_inequality,
+    //arithmetic::mul::lemma_mul_strict_inequality,
+    //bits::lemma_u32_low_bits_mask_is_mod,
+    //bits::lemma_low_bits_mask_values,
+
+    bits::lemma_u64_shl_is_mul,
+    arithmetic::power::lemma_pow_increases,
+    arithmetic::power2::lemma2_to64,
+    arithmetic::power2::pow2,
+    arithmetic::power2::lemma_pow2,
+    arithmetic::power2::lemma_pow2_adds,
+};
 
 const N         : usize = 256;
 const Q         : i32 = 3329;
 const HALF_Q    : i32 = 1665;
 const QINV      : u32 = 62209;
 const NTT_BOUND : i32 = Q * 8;
+const RINV      : i32 = 169;
 
 const U16_MAX_AS_I32 : i32 = u16::MAX as i32;
 const U16_MAX_AS_U32 : u32 = u16::MAX as u32;
@@ -23,7 +36,7 @@ const MRB : i32 = 32768 * (HALF_Q - 1);
 type Poly = [i16; N];
 type ZetaTable = [i16; 128];
 
-const Zetas : ZetaTable =
+const ZETAS : ZetaTable =
   [
     -1044, -758,  -359,  -1517, 1493,  1422,  287,   202,  -171,  622,   1577,
     182,   962,   -1202, -1474, 1468,  573,   -1325, 264,  383,   -829,  1458,
@@ -43,27 +56,30 @@ const Zetas : ZetaTable =
 // Verus can't directly model the semantics of u16 -> i16 conversion
 // at the moment, so we wrap these conversions in a function with
 // suitable postcondition for now..
+#[verifier::external_body]
 fn u16toi16 (x : u16) -> (r : i16)
   ensures (x <= 32767) ==> (r == x),
           (x > 32768)  ==> (r == ((x as i32) - 65536i32) as i16)
 {
-  return #[verifier::truncate] (x as i16);
+  return x as i16;
 }
 
 // Ditto for i32 to u16 conversion
+#[verifier::external_body]
 fn i32tou16 (x : i32) -> (r : u16)
   ensures r == x & 0xFFFF,
           0 <= r <= u16::MAX,
 {
-  return #[verifier::truncate] (x as u16);
+  return x as u16;
 }
 
 // Ditto for u32 to u16 conversion
+#[verifier::external_body]
 fn u32tou16 (x : u32) -> (r : u16)
   ensures r == x & 0xFFFF,
           0 <= r <= u16::MAX,
 {
-  return #[verifier::truncate] (x as u16);
+  return x as u16;
 }
 
 fn montgomery_reduce (a : i32) -> (r : i16)
@@ -102,19 +118,19 @@ fn fqmul (a : i16, b : i16) -> (r : i16)
 }
 
 #[verifier::loop_isolation(false)]
-fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, bound : i16)
+fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
   requires start < N,
            1 <= len <= (N / 2),
            start + 2 * len <= N,
-           0 <= bound < i16::MAX - Q as i16,
+           0 <= _bound < i16::MAX - Q as i16,
            -HALF_Q < zeta < HALF_Q,
 
            // Q3: why old(r) here in the requires clause?
-           forall|i:int| 0 <= i < start ==> -(bound + Q) < #[trigger] old(r)[i] < bound + Q,
-           forall|i:int| start <= i < N ==> -bound < #[trigger] old(r)[i] < bound,
+           forall|i:int| 0 <= i < start ==> -(_bound + Q) < #[trigger] old(r)[i] < _bound + Q,
+           forall|i:int| start <= i < N ==> -_bound < #[trigger] old(r)[i] < _bound,
 
-  ensures  forall|i:int| 0 <= i < start + 2 * len ==> -(bound + Q) < #[trigger] r[i] < bound + Q,
-           forall|i:int| start + 2 * len <= i < N ==> -bound < #[trigger] r[i] < bound,
+  ensures  forall|i:int| 0 <= i < start + 2 * len ==> -(_bound + Q) < #[trigger] r[i] < _bound + Q,
+           forall|i:int| start + 2 * len <= i < N ==> -_bound < #[trigger] r[i] < _bound,
 {
   for j in iter: start .. start + len
 
@@ -174,7 +190,7 @@ fn clen (layer : i16) -> (len : usize)
   ensures 2 <= len <= 128,
           len as nat == pow2((8 - layer) as nat),
 {
-  let ul : u64 = (8 - layer as u64);
+  let ul : u64 = 8 - layer as u64;
   assert (1 <= ul <= 7);
   let r : u64 = 1 << ul;
 
@@ -196,7 +212,7 @@ fn ck (layer : i16) -> (k : usize)
   ensures 1 <= k <= 64,
           k as nat == pow2((layer - 1) as nat),
 {
-  let ul : u64 = ((layer - 1) as u64);
+  let ul : u64 = (layer - 1) as u64;
   assert (0 <= ul <= 6);
   let r : u64 = 1 << ul;
 
@@ -252,7 +268,7 @@ fn ntt_layer (r : &mut Poly, layer : i16)
     requires len * k == 128,
              start == 0;
 
-  while (start + 2 * len <= N)
+  while start + 2 * len <= N
     invariant 1 <= layer <= 7,
               start < N + 2 * len,
               k <= N / 2,
@@ -261,7 +277,7 @@ fn ntt_layer (r : &mut Poly, layer : i16)
               forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < (layer * (Q as i16)),
     decreases N - start,
   {
-    let zeta : i16 = Zetas[k];
+    let zeta : i16 = ZETAS[k];
     ntt_butterfly_block(r, zeta, start, len, layer * (Q as i16));
 
     // Adding 1 to k, and 2*len to start maintains the loop invariant,
@@ -290,3 +306,20 @@ fn poly_ntt (r : &mut Poly)
 
 
 } // verus!
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_montgomery_reduce() {
+        for a in -MRB ..= MRB {
+            let u = montgomery_reduce(a);
+            assert!((u as i32) > -Q && (u as i32) < Q);
+
+            // Something isn't right here!
+            assert_eq!(u % Q as i16, ((a as i64 * RINV as i64) % Q as i64) as i16);
+
+        }
+    }
+}
