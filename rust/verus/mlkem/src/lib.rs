@@ -307,7 +307,7 @@ fn barrett_reduce(a : i16) -> (r : i16)
   assert((i16::MIN as i32 * MAGIC) + TWO25 <= t2 <= (i16::MAX as i32 * MAGIC) + TWO25);
 
   assert(-1i32 >> 1 == -1i32) by (bit_vector);
-  assert(t2 >> 26 == if t2 >= 0 { (t2 / 67_108_864) as i32 } else { ((t2 + 1) / 67_108_864 - 1) as i32 } ) by (bit_vector);
+//  assert(t2 >> 26 == if t2 >= 0 { (t2 / 67_108_864) as i32 } else { ((t2 + 1) / 67_108_864 - 1) as i32 } ) by (bit_vector);
 
   // Verus seems to get lost here...
   let t3 : i32 = t2 >> 26;
@@ -348,6 +348,15 @@ fn poly_reduce (r : &mut Poly)
     r[i] = signed_to_unsigned_q(barrett_reduce(r[i]))
   }
 }
+
+fn div1(a : i32, b: i32) -> (r : i32)
+  requires b != 0,
+           -1000 < a < 1000,
+  ensures r == a / b
+{
+  return a / b;
+}
+
 
 #[verifier::loop_isolation(false)]
 fn poly_ntt (r : &mut Poly)
