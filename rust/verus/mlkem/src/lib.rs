@@ -100,7 +100,7 @@ fn montgomery_reduce (a : i32) -> (r : i16)
   assert (r == a - ((t as i32) * Q));
   assert (result == r >> 16);
 
-  // Q2: Help! How can I get these to prove?
+  // Q1: Help! How can I get these to prove?
   assert (result < Q);  // Can't prove this yet
   assert (result > -Q); // Can't prove this yet
   return result as i16;
@@ -127,7 +127,6 @@ fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _
            0 <= _bound < i16::MAX - Q as i16,
            -HALF_Q < zeta < HALF_Q,
 
-           // Q3: why old(r) here in the requires clause?
            forall|i:int| 0 <= i < start ==> -(_bound + Q) < #[trigger] old(r)[i] < _bound + Q,
            forall|i:int| start <= i < N ==> -_bound < #[trigger] old(r)[i] < _bound,
 
@@ -307,6 +306,9 @@ fn barrett_reduce(a : i16) -> (r : i16)
   assert((i16::MIN as i32 * MAGIC) + TWO25 <= t2 <= (i16::MAX as i32 * MAGIC) + TWO25);
 
   assert(-1i32 >> 1 == -1i32) by (bit_vector);
+
+// Q2 - is this how to establish value of t2 >> 26?
+//      Why don't named constants like MAGIC work here?
 //  assert(t2 >> 26 == if t2 >= 0 { (t2 / 67_108_864) as i32 } else { ((t2 + 1) / 67_108_864 - 1) as i32 } ) by (bit_vector);
 
   // Verus seems to get lost here...
@@ -336,7 +338,8 @@ fn signed_to_unsigned_q(a : i16) -> (r : i16)
 fn poly_reduce (r : &mut Poly)
 {
 
-// It seems that r.iter_mut() is not supported by Verus yet...
+// Q4 It seems that r.iter_mut() is not supported by Verus yet...
+//
 //  for i in r.iter_mut()
 //  {
 //    let t = barrett_reduce(*i);
@@ -345,10 +348,11 @@ fn poly_reduce (r : &mut Poly)
 
   for i in 0 .. N
   {
-    r[i] = signed_to_unsigned_q(barrett_reduce(r[i]))
+    r[i] = signed_to_unsigned_q(barrett_reduce(r[i]));
   }
 }
 
+// Q3 - semantics of / - computer or Euclidean?
 fn div1(a : i32, b: i32) -> (r : i32)
   requires b != 0,
            -1000 < a < 1000,
