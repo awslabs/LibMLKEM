@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-vstd = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
-builtin = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
-builtin_macros = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
+vstd = { git = "https://github.com/verus-lang/verus" }
+#builtin = { git = "https://github.com/verus-lang/verus" }
+#builtin_macros = { git = "https://github.com/verus-lang/verus" }
+#vstd = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
+#builtin = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
+#builtin_macros = { git = "https://github.com/verus-lang/verus", rev = "c3a505494dcbb0792c05817c8070b996d994fcde" }
 
 [package.metadata.verus]
 verify = true
