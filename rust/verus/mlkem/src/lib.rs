@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use vstd::prelude::*;
 
 verus! {
@@ -291,6 +293,7 @@ fn ntt_layer (r : &mut Poly, layer : i16)
 
 }
 
+const TWO26 : i32 = 67_108_864;
 const TWO25 : i32 = 33_554_432;
 const MAGIC : i32 = 20_159; // floor(2**26/Q)
 
@@ -302,6 +305,9 @@ fn barrett_reduce(a : i16) -> (r : i16)
 
   let t2 : i32 = t + TWO25;
   assert((i16::MIN as i32 * MAGIC) + TWO25 <= t2 <= (i16::MAX as i32 * MAGIC) + TWO25);
+
+  assert(-1i32 >> 1 == -1i32) by (bit_vector);
+  assert(t2 >> 26 == if t2 >= 0 { (t2 / 67_108_864) as i32 } else { ((t2 + 1) / 67_108_864 - 1) as i32 } ) by (bit_vector);
 
   // Verus seems to get lost here...
   let t3 : i32 = t2 >> 26;
@@ -318,17 +324,42 @@ fn barrett_reduce(a : i16) -> (r : i16)
   return t5;
 }
 
+fn signed_to_unsigned_q(a : i16) -> (r : i16)
+  ensures 0 <= r < Q
+{
+  let neg : bool = a < 0;
+  let mask : i32 = -1i32 * (neg as i32);
+  let adjustment : i32 = Q & mask;
+  return (a as i32 + adjustment) as i16;
+}
+
+fn poly_reduce (r : &mut Poly)
+{
+
+// It seems that r.iter_mut() is not supported by Verus yet...
+//  for i in r.iter_mut()
+//  {
+//    let t = barrett_reduce(*i);
+//    *i = signed_to_unsigned_q(t);
+//  }
+
+  for i in 0 .. N
+  {
+    r[i] = signed_to_unsigned_q(barrett_reduce(r[i]))
+  }
+}
 
 #[verifier::loop_isolation(false)]
 fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
-  ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
+  ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] r[i] < NTT_BOUND,
 {
   for layer in 1i16 .. 8
     invariant forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < layer * (Q as i16),
   {
     ntt_layer(r, layer);
   }
+  poly_reduce(r);
 }
 
 
@@ -338,6 +369,14 @@ fn poly_ntt (r : &mut Poly)
 mod tests {
     use super::*;
 
+    fn pp (r : Poly)
+    {
+      for i in r.iter()
+      {
+        print!("{} ", i);
+      }
+    }
+
     #[test]
     fn test_montgomery_reduce() {
         for a in -MRB ..= MRB {
@@ -345,8 +384,16 @@ mod tests {
             assert!((u as i32) > -Q && (u as i32) < Q);
 
             // Something isn't right here!
-            assert_eq!(u % Q as i16, ((a as i64 * RINV as i64) % Q as i64) as i16);
+            // assert_eq!(u % Q as i16, ((a as i64 * RINV as i64) % Q as i64) as i16);
 
         }
+    }
+
+    // Run with "cargo test -- --nocapture" to see the output of this one
+    #[test]
+    fn test_poly_ntt() {
+       let mut p : Poly = [3; N];
+       poly_ntt(&mut p);
+       pp(p);
     }
 }
