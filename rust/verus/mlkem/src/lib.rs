@@ -291,8 +291,8 @@ fn ntt_layer (r : &mut Poly, layer : i16)
 
 }
 
-const TWO25 : i32 = 33554432;
-const MAGIC : i32 = 20159; // floor(2**26/Q)
+const TWO25 : i32 = 33_554_432;
+const MAGIC : i32 = 20_159; // floor(2**26/Q)
 
 fn barrett_reduce(a : i16) -> (r : i16)
   ensures -HALF_Q < r < HALF_Q
@@ -306,8 +306,11 @@ fn barrett_reduce(a : i16) -> (r : i16)
   // Verus seems to get lost here...
   let t3 : i32 = t2 >> 26;
 
-  assert(-10 <= t3); // So this doesn't prove
-  assert(t3 <= 10);  // and nor does this
+  assert(-10 <= t3) by (bit_vector)
+    requires (i16::MIN as i32 * 20_159) + 33_554_432 <= t2 <= (i16::MAX as i32 * 20_159) + 33_554_432;
+
+  assert(t3 <= 10) by (bit_vector)
+    requires (i16::MIN as i32 * 20_159) + 33_554_432 <= t2 <= (i16::MAX as i32 * 20_159) + 33_554_432;
 
   // if t3 bounded by +/-10 then t3 * Q needs to be evaluated in 32-bits
   let t4 : i32 = a as i32 - t3 * Q;
