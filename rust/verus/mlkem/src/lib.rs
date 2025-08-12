@@ -20,20 +20,23 @@ use vstd::{
     arithmetic::power2::lemma_pow2_adds,
 };
 
-const N         : usize = 256;
-const Q         : i32 = 3329;
-const HALF_Q    : i32 = 1665;
+// Public constants used in contracts
+pub const N         : usize = 256;
+pub const Q         : i32 = 3329;
+pub const HALF_Q    : i32 = 1665;
+pub const NTT_BOUND : i32 = Q * 8;
+// MRB = Montgomery Reduction Bound
+pub const MRB : i32 = 32768 * (HALF_Q - 1);
+
+
+// Private constants
 const QINV      : u32 = 62209;
-const NTT_BOUND : i32 = Q * 8;
 const RINV      : i32 = 169;
 
 const U16_MAX_AS_I32 : i32 = u16::MAX as i32;
 const U16_MAX_AS_U32 : u32 = u16::MAX as u32;
 const I16_MIN_AS_I32 : i32 = i16::MIN as i32;
 const I16_MAX_AS_I32 : i32 = i16::MAX as i32;
-
-// MRB = Montgomery Reduction Bound
-const MRB : i32 = 32768 * (HALF_Q - 1);
 
 type Poly = [i16; N];
 type ZetaTable = [i16; 128];
@@ -84,7 +87,7 @@ fn u32tou16 (x : u32) -> (r : u16)
   return x as u16;
 }
 
-fn montgomery_reduce (a : i32) -> (r : i16)
+pub fn montgomery_reduce (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
 {
@@ -106,7 +109,7 @@ fn montgomery_reduce (a : i32) -> (r : i16)
   return result as i16;
 }
 
-fn fqmul (a : i16, b : i16) -> (r : i16)
+pub fn fqmul (a : i16, b : i16) -> (r : i16)
   requires -HALF_Q < b < HALF_Q
   ensures -Q < r < Q
 {
@@ -120,7 +123,7 @@ fn fqmul (a : i16, b : i16) -> (r : i16)
 }
 
 #[verifier::loop_isolation(false)]
-fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
+pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
   requires start < N,
            1 <= len <= (N / 2),
            start + 2 * len <= N,
@@ -186,7 +189,7 @@ proof fn lemma_u64_one_shl_is_pow2(shift: u64)
   };
 }
 
-fn clen (layer : i16) -> (len : usize)
+pub fn clen (layer : i16) -> (len : usize)
   requires 1 <= layer <= 7,
   ensures 2 <= len <= 128,
           len as nat == pow2((8 - layer) as nat),
@@ -208,7 +211,7 @@ fn clen (layer : i16) -> (len : usize)
   r as usize
 }
 
-fn ck (layer : i16) -> (k : usize)
+pub fn ck (layer : i16) -> (k : usize)
   requires 1 <= layer <= 7,
   ensures 1 <= k <= 64,
           k as nat == pow2((layer - 1) as nat),
@@ -233,7 +236,7 @@ fn ck (layer : i16) -> (k : usize)
 
 
 #[verifier::loop_isolation(false)]
-fn ntt_layer (r : &mut Poly, layer : i16)
+pub fn ntt_layer (r : &mut Poly, layer : i16)
   requires 1 <= layer <= 7,
            forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
@@ -296,7 +299,8 @@ const TWO26 : i32 = 67_108_864;
 const TWO25 : i32 = 33_554_432;
 const MAGIC : i32 = 20_159; // floor(2**26/Q)
 
-fn barrett_reduce(a : i16) -> (r : i16)
+#[inline(never)]
+pub fn barrett_reduce(a : i16) -> (r : i16)
   ensures -HALF_Q < r < HALF_Q
 {
   let t  : i32 = MAGIC * a as i32;
@@ -326,44 +330,26 @@ fn barrett_reduce(a : i16) -> (r : i16)
   return t5;
 }
 
-fn signed_to_unsigned_q(a : i16) -> (r : i16)
+#[inline(never)]
+pub fn signed_to_unsigned_q(a : i16) -> (r : i16)
+  requires -Q < a < Q
   ensures 0 <= r < Q
 {
-  let neg : bool = a < 0;
-  let mask : i32 = -1i32 * (neg as i32);
-  let adjustment : i32 = Q & mask;
+  let adjustment : i32 = if a < 0 {Q} else {0};
   return (a as i32 + adjustment) as i16;
 }
 
-fn poly_reduce (r : &mut Poly)
+
+pub fn poly_reduce (r : &mut Poly)
 {
-
-// Q4 It seems that r.iter_mut() is not supported by Verus yet...
-//
-//  for i in r.iter_mut()
-//  {
-//    let t = barrett_reduce(*i);
-//    *i = signed_to_unsigned_q(t);
-//  }
-
   for i in 0 .. N
   {
     r[i] = signed_to_unsigned_q(barrett_reduce(r[i]));
   }
 }
 
-// Q3 - semantics of / - computer or Euclidean?
-fn div1(a : i32, b: i32) -> (r : i32)
-  requires b != 0,
-           -1000 < a < 1000,
-  ensures r == a / b
-{
-  return a / b;
-}
-
-
 #[verifier::loop_isolation(false)]
-fn poly_ntt (r : &mut Poly)
+pub fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
   ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] r[i] < NTT_BOUND,
 {
