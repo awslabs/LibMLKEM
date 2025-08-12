@@ -341,8 +341,12 @@ pub fn signed_to_unsigned_q(a : i16) -> (r : i16)
 
 
 pub fn poly_reduce (r : &mut Poly)
+  requires forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
+  ensures forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
 {
   for i in 0 .. N
+    invariant 0 <= i <= N,
+              forall|k:int| 0 <= k < i ==> 0 <= #[trigger] r[k] < Q,
   {
     r[i] = signed_to_unsigned_q(barrett_reduce(r[i]));
   }
@@ -351,10 +355,11 @@ pub fn poly_reduce (r : &mut Poly)
 #[verifier::loop_isolation(false)]
 pub fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
-  ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] r[i] < NTT_BOUND,
+  ensures  forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
 {
   for layer in 1i16 .. 8
-    invariant forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < layer * (Q as i16),
+    invariant 1 <= layer <= 8,
+              forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < layer * (Q as i16),
   {
     ntt_layer(r, layer);
   }
