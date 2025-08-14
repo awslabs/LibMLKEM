@@ -1,6 +1,33 @@
 #![allow(dead_code)]
 
 use vstd::prelude::*;
+use cpucycles::CpuCycles;
+
+pub const N : usize = 256;
+type Poly = [i16; N];
+
+const INIT_P : Poly = [3i16; N];
+
+// Binding to C Reference implementation
+pub mod cref
+{
+  use crate::Poly;
+  
+  #[repr(C)]
+  #[repr(align(32))]
+  #[derive(Debug, Copy, Clone)]
+  pub struct mlk_poly {
+      pub coeffs: Poly,
+  }
+
+  unsafe extern "C" {
+    pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(r: *mut mlk_poly);
+  }
+  
+  unsafe extern "C" {
+    pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(r: *mut mlk_poly);
+  }
+}
 
 verus! {
 
@@ -21,7 +48,6 @@ use vstd::{
 };
 
 // Public constants used in contracts
-pub const N         : usize = 256;
 pub const Q         : i32 = 3329;
 pub const HALF_Q    : i32 = 1665;
 pub const NTT_BOUND : i32 = Q * 8;
@@ -38,7 +64,6 @@ const U16_MAX_AS_U32 : u32 = u16::MAX as u32;
 const I16_MIN_AS_I32 : i32 = i16::MIN as i32;
 const I16_MAX_AS_I32 : i32 = i16::MAX as i32;
 
-type Poly = [i16; N];
 type ZetaTable = [i16; 128];
 
 const ZETAS : ZetaTable =
@@ -378,6 +403,7 @@ mod tests {
       {
         print!("{} ", i);
       }
+      println!("END");
     }
 
     #[test]
@@ -395,12 +421,33 @@ mod tests {
     // Run with "cargo test -- --nocapture" to see the output of this one
     #[test]
     fn test_poly_ntt() {
-       let mut p : Poly = [3; N];
+       let cpu : CpuCycles = CpuCycles::new();       
+       println!("libcpucycles version: {}", CpuCycles::version(&cpu));
+       println!("libcpucycles implem : {}", CpuCycles::implementation(&cpu));
+
+       let mut p = cref::mlk_poly { coeffs: INIT_P };
+
+       let start = cpu.get();
        for _i in 0 .. 1000
        {
-         poly_ntt(&mut p);
-         poly_reduce(& mut p);
+         poly_ntt(&mut p.coeffs);
+         poly_reduce(&mut p.coeffs);
        }
-       pp(p);
+       let end = cpu.get();
+       pp(p.coeffs);
+
+       p = cref::mlk_poly { coeffs: INIT_P };
+       let start2 = cpu.get();
+       for _i in 0 .. 1000
+       {
+         unsafe { cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(&mut p); }
+         unsafe { cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(&mut p); }
+       }
+       let end2 = cpu.get();
+       pp(p.coeffs);
+
+       println!("Rust Cycles = {}", end - start);
+       println!("   C Cycles = {}", end2 - start2);
+
     }
 }
