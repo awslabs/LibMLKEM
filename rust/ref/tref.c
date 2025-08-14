@@ -51,11 +51,11 @@ int main()
    pp(&p1);
 
    count1 = cpucycles();
-//   for (int i = 0; i < 1000; i++)
-//   {
+   for (int i = 0; i < 1000; i++)
+   {
       mlk_poly_ntt(&p1);
       mlk_poly_reduce(&p1);
-//   }
+   }
    count2 = cpucycles();
    e = count2 - count1;
 
