@@ -422,8 +422,8 @@ mod tests {
     #[test]
     fn test_poly_ntt() {
        let cpu : CpuCycles = CpuCycles::new();       
-       println!("libcpucycles version: {}", CpuCycles::version(&cpu));
-       println!("libcpucycles implem : {}", CpuCycles::implementation(&cpu));
+       println!("libcpucycles version: {}", cpu.version());
+       println!("libcpucycles implem : {}", cpu.implementation());
 
        let mut p = cref::mlk_poly { coeffs: INIT_P };
 
