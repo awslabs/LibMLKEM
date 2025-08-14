@@ -363,7 +363,6 @@ pub fn poly_ntt (r : &mut Poly)
   {
     ntt_layer(r, layer);
   }
-  poly_reduce(r);
 }
 
 
@@ -397,7 +396,11 @@ mod tests {
     #[test]
     fn test_poly_ntt() {
        let mut p : Poly = [3; N];
-       poly_ntt(&mut p);
+       for _i in 0 .. 1000
+       {
+         poly_ntt(&mut p);
+         poly_reduce(& mut p);
+       }
        pp(p);
     }
 }
