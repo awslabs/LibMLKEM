@@ -12,7 +12,7 @@ verus! {
   pub mod cref
   {
     use crate::Poly;
-  
+
     #[repr(C)]
     #[repr(align(32))]
     #[derive(Debug, Copy, Clone)]
@@ -23,7 +23,7 @@ verus! {
     unsafe extern "C" {
       pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(r: *mut mlk_poly);
     }
-  
+
     unsafe extern "C" {
       pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(r: *mut mlk_poly);
     }
@@ -395,62 +395,59 @@ pub fn poly_ntt (r : &mut Poly)
 mod tests {
     use super::*;
 
-    fn pp (r : Poly)
-    {
-      for i in r.iter()
-      {
-        print!("{} ", i);
-      }
-      println!("END");
+    fn pp(r: Poly) {
+        for i in r.iter() {
+            print!("{} ", i);
+        }
+        println!("END");
     }
 
     #[test]
     fn test_montgomery_reduce() {
-        for a in -MRB ..= MRB {
+        for a in -MRB..=MRB {
             let u = montgomery_reduce(a);
             assert!((u as i32) > -Q && (u as i32) < Q);
 
             // Something isn't right here!
             // assert_eq!(u % Q as i16, ((a as i64 * RINV as i64) % Q as i64) as i16);
-
         }
     }
 
     // Run with "cargo test -- --nocapture" to see the output of this one
     #[test]
     fn test_poly_ntt() {
+        use cpucycles::CpuCycles;
 
-       use cpucycles::CpuCycles;
+        const INIT_P: Poly = [3i16; N];
 
-       const INIT_P : Poly = [3i16; N];
+        let cpu: CpuCycles = CpuCycles::new();
+        println!("libcpucycles version: {}", cpu.version());
+        println!("libcpucycles implem : {}", cpu.implementation());
 
-       let cpu : CpuCycles = CpuCycles::new();       
-       println!("libcpucycles version: {}", cpu.version());
-       println!("libcpucycles implem : {}", cpu.implementation());
+        let mut p = cref::mlk_poly { coeffs: INIT_P };
 
-       let mut p = cref::mlk_poly { coeffs: INIT_P };
+        let start = cpu.get();
+        for _i in 0..1000 {
+            poly_ntt(&mut p.coeffs);
+            poly_reduce(&mut p.coeffs);
+        }
+        let end = cpu.get();
+        pp(p.coeffs);
 
-       let start = cpu.get();
-       for _i in 0 .. 1000
-       {
-         poly_ntt(&mut p.coeffs);
-         poly_reduce(&mut p.coeffs);
-       }
-       let end = cpu.get();
-       pp(p.coeffs);
+        p = cref::mlk_poly { coeffs: INIT_P };
+        let start2 = cpu.get();
+        for _i in 0..1000 {
+            unsafe {
+                cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(&mut p);
+            }
+            unsafe {
+                cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(&mut p);
+            }
+        }
+        let end2 = cpu.get();
+        pp(p.coeffs);
 
-       p = cref::mlk_poly { coeffs: INIT_P };
-       let start2 = cpu.get();
-       for _i in 0 .. 1000
-       {
-         unsafe { cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(&mut p); }
-         unsafe { cref::PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(&mut p); }
-       }
-       let end2 = cpu.get();
-       pp(p.coeffs);
-
-       println!("Rust Cycles = {}", end - start);
-       println!("   C Cycles = {}", end2 - start2);
-
+        println!("Rust Cycles = {}", end - start);
+        println!("   C Cycles = {}", end2 - start2);
     }
 }
