@@ -34,8 +34,8 @@ use vstd::{
 
     //arithmetic::mul::lemma_mul_inequality,
     //arithmetic::mul::lemma_mul_strict_inequality,
-    //bits::lemma_u32_low_bits_mask_is_mod,
-    //bits::lemma_low_bits_mask_values,
+    bits::lemma_u32_low_bits_mask_is_mod,
+    bits::lemma_low_bits_mask_values,
 
     bits::lemma_u64_shl_is_mul,
     arithmetic::power::lemma_pow_increases,
@@ -54,8 +54,12 @@ pub const MRB : i32 = 32768 * (HALF_Q - 1);
 
 
 // Private constants
-const QINV      : u32 = 62209;
-const RINV      : i32 = 169;
+const QINV16 : u16 = 3327;
+const QINV32 : u32 = 62209;
+
+// Montgomery factor R (2^16) and its inverse
+pub const R: i32 = 65536;
+pub const RINV : i32 = 169;
 
 const U16_MAX_AS_I32 : i32 = u16::MAX as i32;
 const U16_MAX_AS_U32 : u32 = u16::MAX as u32;
@@ -79,6 +83,76 @@ const ZETAS : ZetaTable =
     -1187, -1659, -1185, -1530, -1278, 794,   -1510, -854, -870,  478,   -108,
     -308,  996,   991,   958,   -1460, 1522,  1628,
   ];
+
+
+// Proof that RINV is the modular inverse of R modulo Q.
+proof fn lemma_r_rinv_inverses_mod_q()
+    ensures
+        (R as int * RINV as int) % Q as int == 1,
+{
+    assert((R as int * RINV as int) % Q as int == 1) by (compute_only);
+}
+
+// Proof of the relation between the field modulus Q, Montgomery factor R, and
+// their inverses.
+proof fn lemma_q_r_montgomery_relation()
+    ensures
+        Q as int * QINV16 as int == R as int * RINV as int - 1,
+{
+    assert(Q as int * QINV16 as int == R as int * RINV as int - 1) by (compute_only);
+}
+
+proof fn lemma_montgomery_reduction_numerator(
+    a: int,
+    t: int,
+    m: int,
+    r: int,
+    rinv: int,
+    q: int,
+    qinv: int,
+)
+    by (integer_ring)
+    requires
+        r != 0,
+        t == a % r,
+        m == (t * qinv) % r,
+        q * qinv == r * rinv - 1,
+    ensures
+        (a + m * q) % r == 0,
+{
+}
+
+proof fn lemma_cast_i32_to_u32_preserves_mod(s: i32)
+    ensures
+        (s as u32) as int % 4294967296 == s as int % 4294967296,
+{
+    assert(s >= 0 ==> s as u32 == s as int);
+    assert(s < 0 ==> s as u32 == 4294967296int + (s as int)) by (bit_vector);
+}
+
+fn cast_unsigned_32(s: i32) -> (u: u32)
+    ensures
+        u as int % 4294967296 == s as int % 4294967296,
+{
+    proof { lemma_cast_i32_to_u32_preserves_mod(s) }
+    s as u32
+}
+
+proof fn lemma_cast_u16_to_i16_preserves_mod(u: u16)
+    ensures
+        (u as i16) as int % 65536 == u as int % 65536,
+{
+    assert(u < 32768 ==> u as i16 == u as int);
+    assert(u >= 32768 ==> u as i16 == -((65536 - u) as int)) by (bit_vector);
+}
+
+fn cast_signed_16(u: u16) -> (s: i16)
+    ensures
+        s as int % 65536 == u as int % 65536,
+{
+    proof { lemma_cast_u16_to_i16_preserves_mod(u) }
+    u as i16
+}
 
 
 // Verus can't directly model the semantics of u16 -> i16 conversion
@@ -110,12 +184,21 @@ fn u32tou16 (x : u32) -> (r : u16)
   return x as u16;
 }
 
-pub fn montgomery_reduce (a : i32) -> (r : i16)
+proof fn lemma_mask_is_mod(a: u32)
+    ensures
+        a & 0xffff == a % 0x10000,
+{
+    lemma_low_bits_mask_values();
+    lemma_u32_low_bits_mask_is_mod(a, 16);
+    lemma2_to64();
+}
+
+pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
 {
   let a_reduced  : u16 = i32tou16 (a);
-  let a_inverted : u16 = u32tou16 ((a_reduced as u32) * QINV);
+  let a_inverted : u16 = u32tou16 ((a_reduced as u32) * QINV32);
 
   let t : i16 = u16toi16 (a_inverted);
 
@@ -132,6 +215,54 @@ pub fn montgomery_reduce (a : i32) -> (r : i16)
   return result as i16;
 }
 
+#[verifier::nonlinear]
+pub exec fn montgomery_reduce_mike(a: i32) -> (u: i16)
+    requires -MRB <= a <= MRB
+    ensures
+        u as int % Q as int == (a as int * RINV as int) % Q as int,
+        -Q < u < Q,
+{
+    // Reduce a modulo R.
+    let au = cast_unsigned_32(a);
+    let amod = au & 0xffff;
+    assert(amod == au as int % R as int) by {
+        lemma_mask_is_mod(au);
+    };
+    let t = amod as u16;
+    assert(t == a % R);
+
+    // Compute t * Q' mod R.
+    let m = t.wrapping_mul(QINV16);
+
+    // Cast to a signed representative.
+    let ms = cast_signed_16(m);
+
+    // Compute m*Q.
+    let m_q = (ms as i32) * (Q as i32);
+
+    // Compute a + m*Q, and prove it is a multiple of R.
+    let n = a + m_q;
+
+    // Prove: a + m*Q = 0 (mod R).
+    assert(n as int % R as int == 0) by {
+        lemma_montgomery_reduction_numerator(
+            a as int,
+            t as int,
+            m as int,
+            R as int,
+            RINV as int,
+            Q as int,
+            QINV16 as int,
+        );
+    };
+
+    // Compute (a + m * Q) / R.
+    let u = n / R;
+
+    return u as i16;
+}
+
+
 pub fn fqmul (a : i16, b : i16) -> (r : i16)
   requires -HALF_Q < b < HALF_Q
   ensures -Q < r < Q
@@ -142,7 +273,7 @@ pub fn fqmul (a : i16, b : i16) -> (r : i16)
 
   let arg : i32 = (a as i32) * (b as i32);
 
-  return montgomery_reduce (arg);
+  return montgomery_reduce_rod (arg);
 }
 
 #[verifier::loop_isolation(false)]
@@ -405,11 +536,21 @@ mod tests {
     #[test]
     fn test_montgomery_reduce() {
         for a in -MRB..=MRB {
-            let u = montgomery_reduce(a);
-            assert!((u as i32) > -Q && (u as i32) < Q);
+            let u_rod = montgomery_reduce_rod(a);
+            let u_mike = montgomery_reduce_mike(a);
 
-            // Something isn't right here!
-            // assert_eq!(u % Q as i16, ((a as i64 * RINV as i64) % Q as i64) as i16);
+	    // Normalize results to 0 .. Q
+            let urq = if u_rod >= 0 {u_rod} else {u_rod + Q as i16};
+            let umq = if u_mike >= 0 {u_mike} else {u_mike + Q as i16};
+
+            assert!((u_rod as i32) > -Q && (u_rod as i32) < Q);
+            assert!((u_mike as i32) > -Q && (u_mike as i32) < Q);
+
+            if urq != umq
+	    {
+               println!("input {} rod {}, mike {}", a, urq, umq);
+	    }
+            assert!(urq == umq);
         }
     }
 
