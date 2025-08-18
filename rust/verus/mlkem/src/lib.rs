@@ -193,6 +193,7 @@ proof fn lemma_mask_is_mod(a: u32)
     lemma2_to64();
 }
 
+#[inline(never)]
 pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
@@ -215,6 +216,7 @@ pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   return result as i16;
 }
 
+#[inline(never)]
 #[verifier::nonlinear]
 pub exec fn montgomery_reduce_mike(a: i32) -> (u: i16)
     requires -MRB <= a <= MRB
