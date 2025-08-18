@@ -1,35 +1,33 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 
 use vstd::prelude::*;
-use cpucycles::CpuCycles;
-
-pub const N : usize = 256;
-type Poly = [i16; N];
-
-const INIT_P : Poly = [3i16; N];
-
-// Binding to C Reference implementation
-pub mod cref
-{
-  use crate::Poly;
-  
-  #[repr(C)]
-  #[repr(align(32))]
-  #[derive(Debug, Copy, Clone)]
-  pub struct mlk_poly {
-      pub coeffs: Poly,
-  }
-
-  unsafe extern "C" {
-    pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(r: *mut mlk_poly);
-  }
-  
-  unsafe extern "C" {
-    pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(r: *mut mlk_poly);
-  }
-}
 
 verus! {
+
+  pub const N : usize = 256;
+  type Poly = [i16; N];
+
+  // Binding to C Reference implementation
+  pub mod cref
+  {
+    use crate::Poly;
+  
+    #[repr(C)]
+    #[repr(align(32))]
+    #[derive(Debug, Copy, Clone)]
+    pub struct mlk_poly {
+        pub coeffs: Poly,
+    }
+
+    unsafe extern "C" {
+      pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_ntt(r: *mut mlk_poly);
+    }
+  
+    unsafe extern "C" {
+      pub fn PQCP_MLKEM_NATIVE_MLKEM768_poly_reduce(r: *mut mlk_poly);
+    }
+  }
 
 #[cfg(verus_keep_ghost)]
 use vstd::{
@@ -421,6 +419,11 @@ mod tests {
     // Run with "cargo test -- --nocapture" to see the output of this one
     #[test]
     fn test_poly_ntt() {
+
+       use cpucycles::CpuCycles;
+
+       const INIT_P : Poly = [3i16; N];
+
        let cpu : CpuCycles = CpuCycles::new();       
        println!("libcpucycles version: {}", cpu.version());
        println!("libcpucycles implem : {}", cpu.implementation());
