@@ -398,28 +398,14 @@ pub fn ntt_layer (r : &mut Poly, layer : i16)
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
 {
   broadcast use lemma_u64_shl_is_mul;
-  broadcast use lemma_pow2_adds;
 
   let     len : usize = clen (layer);
   let mut k   : usize = ck (layer);
 
-  assert(2 <= len <= 128);
-  assert(1 <= k <= 64);
-
-  // It helps to know that len * k == 128.
-  // Using the pow2 and bits lemmas, this all seems a bit long-winded.
-  // Is there an easier and more elegant way?
-  assert(len as nat == pow2((8 - layer) as nat));
-  assert(k   as nat == pow2((layer - 1) as nat));
-  assert((len as nat) * (k as nat) == pow2((8 - layer) as nat) * pow2((layer - 1) as nat));
-  assert(pow2((8 - layer) as nat) * pow2((layer - 1) as nat) == pow2((8 - layer) as nat + (layer - 1) as nat));
-  assert((8 - layer) as nat + (layer - 1) as nat == 7);
-  assert(pow2((8 - layer) as nat) * pow2((layer - 1) as nat) == pow2(7));
-  assert((len as nat) * (k as nat) == pow2(7));
-  assert(pow2(7) == 128) by { lemma2_to64() };
-  assert((len as nat) * (k as nat) == 128);
-  // At last!
-  assert(len * k == 128);
+  assert(len * k == 128) by {
+    lemma_pow2_adds((layer - 1) as nat, (8 - layer) as nat);
+    lemma2_to64();
+  }
 
   let mut start : usize = 0;
 
