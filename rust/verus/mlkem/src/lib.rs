@@ -198,10 +198,10 @@ pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
 {
-  let a_reduced  : u16 = i32tou16 (a);
-  let a_inverted : u16 = u32tou16 ((a_reduced as u32) * QINV32);
+  let a_reduced  : u16 = a as u16;
+  let a_inverted : u16 = ((a_reduced as u32) * QINV32) as u16;
 
-  let t : i16 = u16toi16 (a_inverted);
+  let t : i16 = a_inverted as i16;
 
   let r : i32 = a - ((t as i32) * Q);
 
@@ -210,9 +210,18 @@ pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   assert (r == a - ((t as i32) * Q));
   assert (result == r >> 16);
 
-  // Q1: Help! How can I get these to prove?
-  assert (result < Q);  // Can't prove this yet
-  assert (result > -Q); // Can't prove this yet
+  // Unfortunately `by (bit_vector)` requires inlining the
+  // entire computation above here, including inserting constants
+  // due to https://github.com/verus-lang/verus/issues/1858
+  assert (-3329 < result < 3329) by (bit_vector)
+    requires ({
+      &&& result == r >> 16
+      &&& r == (a - ((t as i32) * 3329))
+      &&& t == a_inverted as i16
+      &&& a_inverted == ((a_reduced as u32) * 62209u32) as u16
+      &&& a_reduced == a as u16
+      &&& -32768 * (1665 - 1) <= a <= 32768 * (1665 - 1)
+  });
   return result as i16;
 }
 
@@ -453,22 +462,26 @@ pub fn barrett_reduce(a : i16) -> (r : i16)
 
   assert(-1i32 >> 1 == -1i32) by (bit_vector);
 
-// Q2 - is this how to establish value of t2 >> 26?
-//      Why don't named constants like MAGIC work here?
-//  assert(t2 >> 26 == if t2 >= 0 { (t2 / 67_108_864) as i32 } else { ((t2 + 1) / 67_108_864 - 1) as i32 } ) by (bit_vector);
-
-  // Verus seems to get lost here...
   let t3 : i32 = t2 >> 26;
 
-  assert(-10 <= t3) by (bit_vector)
-    requires (i16::MIN as i32 * 20_159) + 33_554_432 <= t2 <= (i16::MAX as i32 * 20_159) + 33_554_432;
-
-  assert(t3 <= 10) by (bit_vector)
-    requires (i16::MIN as i32 * 20_159) + 33_554_432 <= t2 <= (i16::MAX as i32 * 20_159) + 33_554_432;
+  // bit_vector proofs unfortunately require restating the whole
+  // proof context.
+  assert({
+    &&& (-10 <= t3 <= 10)
+    &&& -1665 < ((a as i32 - t3 * 3329) as i16) < 1665
+  }) by (bit_vector)
+    requires
+      ({
+        &&& (i16::MIN as i32 * 20_159) + 33_554_432 <= t2 <= (i16::MAX as i32 * 20_159) + 33_554_432
+        &&& t3 == t2 >> 26
+        &&& t2 == t + 33_554_432
+        &&& t == 20_159 * a
+      });
 
   // if t3 bounded by +/-10 then t3 * Q needs to be evaluated in 32-bits
   let t4 : i32 = a as i32 - t3 * Q;
   let t5 : i16 = t4 as i16;
+
   return t5;
 }
 
