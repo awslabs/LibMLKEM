@@ -1,5 +1,6 @@
 CC=clang-20
-all: tref
+AR=llvm-ar-20
+all: tref librefc.a
 
 #gcc -c -O3 -Wall -fopt-info-vec-missed poly.c
 
@@ -11,3 +12,8 @@ tref.o: tref.c poly.h
 
 tref: tref.o poly.o
 	$(CC) -o tref tref.o poly.o -lcpucycles -L$(HOME)/lib
+
+librefc.a: poly.o
+	$(AR) r librefc.a poly.o
+	cp librefc.a $(HOME)/lib
+
