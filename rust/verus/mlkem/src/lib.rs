@@ -274,6 +274,7 @@ pub exec fn montgomery_reduce_mike(a: i32) -> (u: i16)
 }
 
 
+#[inline(never)]
 pub fn fqmul (a : i16, b : i16) -> (r : i16)
   requires -HALF_Q < b < HALF_Q
   ensures -Q < r < Q
@@ -287,6 +288,7 @@ pub fn fqmul (a : i16, b : i16) -> (r : i16)
   return montgomery_reduce_rod (arg);
 }
 
+#[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
   requires start < N,
@@ -400,6 +402,7 @@ pub fn ck (layer : i16) -> (k : usize)
 
 
 
+#[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn ntt_layer (r : &mut Poly, layer : i16)
   requires 1 <= layer <= 7,
@@ -495,6 +498,7 @@ pub fn signed_to_unsigned_q(a : i16) -> (r : i16)
 }
 
 
+#[inline(never)]
 pub fn poly_reduce (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
   ensures forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
@@ -507,6 +511,7 @@ pub fn poly_reduce (r : &mut Poly)
   }
 }
 
+#[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
