@@ -515,7 +515,7 @@ pub fn poly_reduce (r : &mut Poly)
 #[verifier::loop_isolation(false)]
 pub fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
-  ensures  forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
+  ensures  forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] r[i] < NTT_BOUND,
 {
   for layer in 1i16 .. 8
     invariant 1 <= layer <= 8,
