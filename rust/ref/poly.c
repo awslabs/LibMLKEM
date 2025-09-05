@@ -127,14 +127,8 @@ __contract__(
   ensures(return_value >= 0 && return_value < MLKEM_Q)
   ensures(return_value == (int32_t)c + (((int32_t)c < 0) * MLKEM_Q)))
 {
-  mlk_assert_abs_bound(&c, 1, MLKEM_Q);
-
-  /* Add Q if c is negative, but in constant time */
-  c = mlk_ct_sel_int16(c + MLKEM_Q, c, mlk_ct_cmask_neg_i16(c));
-
-  /* and therefore cast to uint16_t is safe. */
-  mlk_assert_bound(&c, 1, 0, MLKEM_Q);
-  return (uint16_t)c;
+  int16_t adjustment = c < 0 ? MLKEM_Q : 0;
+  return c + adjustment;
 }
 
 /* Reference: `poly_reduce()` in the reference implementation @[REF]
