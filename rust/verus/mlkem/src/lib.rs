@@ -193,8 +193,8 @@ proof fn lemma_mask_is_mod(a: u32)
     lemma2_to64();
 }
 
-#[inline(never)]
-pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
+//#[inline(never)]
+fn montgomery_reduce_rod (a : i32) -> (r : i16)
   requires -MRB <= a <= MRB
   ensures -Q < r < Q
 {
@@ -225,57 +225,8 @@ pub fn montgomery_reduce_rod (a : i32) -> (r : i16)
   return result as i16;
 }
 
-#[inline(never)]
-#[verifier::nonlinear]
-pub exec fn montgomery_reduce_mike(a: i32) -> (u: i16)
-    requires -MRB <= a <= MRB
-    ensures
-        u as int % Q as int == (a as int * RINV as int) % Q as int,
-        -Q < u < Q,
-{
-    // Reduce a modulo R.
-    let au = cast_unsigned_32(a);
-    let amod = au & 0xffff;
-    assert(amod == au as int % R as int) by {
-        lemma_mask_is_mod(au);
-    };
-    let t = amod as u16;
-    assert(t == a % R);
-
-    // Compute t * Q' mod R.
-    let m = t.wrapping_mul(QINV16);
-
-    // Cast to a signed representative.
-    let ms = cast_signed_16(m);
-
-    // Compute m*Q.
-    let m_q = (ms as i32) * (Q as i32);
-
-    // Compute a + m*Q, and prove it is a multiple of R.
-    let n = a + m_q;
-
-    // Prove: a + m*Q = 0 (mod R).
-    assert(n as int % R as int == 0) by {
-        lemma_montgomery_reduction_numerator(
-            a as int,
-            t as int,
-            m as int,
-            R as int,
-            RINV as int,
-            Q as int,
-            QINV16 as int,
-        );
-    };
-
-    // Compute (a + m * Q) / R.
-    let u = n / R;
-
-    return u as i16;
-}
-
-
-#[inline(never)]
-pub fn fqmul (a : i16, b : i16) -> (r : i16)
+//#[inline(never)]
+fn fqmul (a : i16, b : i16) -> (r : i16)
   requires -HALF_Q < b < HALF_Q
   ensures -Q < r < Q
 {
@@ -288,9 +239,9 @@ pub fn fqmul (a : i16, b : i16) -> (r : i16)
   return montgomery_reduce_rod (arg);
 }
 
-#[inline(never)]
+//#[inline(never)]
 #[verifier::loop_isolation(false)]
-pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
+fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
   requires start < N,
            1 <= len <= (N / 2),
            start + 2 * len <= N,
@@ -356,7 +307,7 @@ proof fn lemma_u64_one_shl_is_pow2(shift: u64)
   };
 }
 
-pub fn clen (layer : i16) -> (len : usize)
+fn clen (layer : i16) -> (len : usize)
   requires 1 <= layer <= 7,
   ensures 2 <= len <= 128,
           len as nat == pow2((8 - layer) as nat),
@@ -378,7 +329,7 @@ pub fn clen (layer : i16) -> (len : usize)
   r as usize
 }
 
-pub fn ck (layer : i16) -> (k : usize)
+fn ck (layer : i16) -> (k : usize)
   requires 1 <= layer <= 7,
   ensures 1 <= k <= 64,
           k as nat == pow2((layer - 1) as nat),
@@ -402,9 +353,9 @@ pub fn ck (layer : i16) -> (k : usize)
 
 
 
-#[inline(never)]
+//#[inline(never)]
 #[verifier::loop_isolation(false)]
-pub fn ntt_layer (r : &mut Poly, layer : i16)
+fn ntt_layer (r : &mut Poly, layer : i16)
   requires 1 <= layer <= 7,
            forall|i:int| 0 <= i < N ==> (-layer * (Q as i16)) < #[trigger] old(r)[i] < (layer * (Q as i16)),
   ensures  forall|i:int| 0 <= i < N ==> (-(layer + 1) * (Q as i16)) < #[trigger] r[i] < ((layer + 1) * (Q as i16)),
@@ -453,8 +404,8 @@ const TWO26 : i32 = 67_108_864;
 const TWO25 : i32 = 33_554_432;
 const MAGIC : i32 = 20_159; // floor(2**26/Q)
 
-#[inline(never)]
-pub fn barrett_reduce(a : i16) -> (r : i16)
+//#[inline(never)]
+fn barrett_reduce(a : i16) -> (r : i16)
   ensures -HALF_Q < r < HALF_Q
 {
   let t  : i32 = MAGIC * a as i32;
@@ -488,8 +439,8 @@ pub fn barrett_reduce(a : i16) -> (r : i16)
   return t5;
 }
 
-#[inline(never)]
-pub fn signed_to_unsigned_q(a : i16) -> (r : i16)
+//#[inline(never)]
+fn signed_to_unsigned_q(a : i16) -> (r : i16)
   requires -Q < a < Q
   ensures 0 <= r < Q
 {
@@ -498,7 +449,7 @@ pub fn signed_to_unsigned_q(a : i16) -> (r : i16)
 }
 
 
-#[inline(never)]
+//#[inline(never)]
 pub fn poly_reduce (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
   ensures forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
@@ -511,7 +462,7 @@ pub fn poly_reduce (r : &mut Poly)
   }
 }
 
-#[inline(never)]
+//#[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn poly_ntt (r : &mut Poly)
   requires forall|i:int| 0 <= i < N ==> -Q < #[trigger] old(r)[i] < Q,
@@ -539,26 +490,26 @@ mod tests {
         println!("END");
     }
 
-    #[test]
-    fn test_montgomery_reduce() {
-        for a in -MRB..=MRB {
-            let u_rod = montgomery_reduce_rod(a);
-            let u_mike = montgomery_reduce_mike(a);
+//    #[test]
+//    fn test_montgomery_reduce() {
+//        for a in -MRB..=MRB {
+//            let u_rod = montgomery_reduce_rod(a);
+//            let u_mike = montgomery_reduce_mike(a);
 
-	    // Normalize results to 0 .. Q
-            let urq = if u_rod >= 0 {u_rod} else {u_rod + Q as i16};
-            let umq = if u_mike >= 0 {u_mike} else {u_mike + Q as i16};
+//	    // Normalize results to 0 .. Q
+//            let urq = if u_rod >= 0 {u_rod} else {u_rod + Q as i16};
+//            let umq = if u_mike >= 0 {u_mike} else {u_mike + Q as i16};
 
-            assert!((u_rod as i32) > -Q && (u_rod as i32) < Q);
-            assert!((u_mike as i32) > -Q && (u_mike as i32) < Q);
+//            assert!((u_rod as i32) > -Q && (u_rod as i32) < Q);
+//            assert!((u_mike as i32) > -Q && (u_mike as i32) < Q);
 
-            if urq != umq
-	    {
-               println!("input {} rod {}, mike {}", a, urq, umq);
-	    }
-            assert!(urq == umq);
-        }
-    }
+//            if urq != umq
+//	    {
+//               println!("input {} rod {}, mike {}", a, urq, umq);
+//	    }
+//            assert!(urq == umq);
+//        }
+//    }
 
     // Run with "cargo test -- --nocapture" to see the output of this one
     #[test]
