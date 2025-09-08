@@ -22,6 +22,96 @@
 #include "cbmc.h"
 #include "poly.h"
 
+// #define MLK_DEFAULT_INLINE __attribute__((noinline))
+#define MLK_DEFAULT_INLINE
+
+/*************************************************
+ * Name:        mlk_cast_uint16_to_int16
+ *
+ * Description: Cast uint16 value to int16
+ *
+ * Returns:
+ *   input x in     0 .. 32767: returns value unchanged
+ *   input x in 32768 .. 65535: returns (x - 65536)
+ **************************************************/
+
+#ifdef CBMC
+#pragma CPROVER check push
+#pragma CPROVER check disable "conversion"
+#endif
+static MLK_ALWAYS_INLINE int16_t mlk_cast_uint16_to_int16(uint16_t x)
+{
+  /*
+   * PORTABILITY: This relies on uint16_t -> int16_t
+   * being implemented as the inverse of int16_t -> uint16_t,
+   * which is implementation-defined (C99 6.3.1.3 (3))
+   * CBMC (correctly) fails to prove this conversion is OK,
+   * so we have to suppress that check here
+   */
+  return (int16_t)x;
+}
+#ifdef CBMC
+#pragma CPROVER check pop
+#endif
+
+/*************************************************
+ * Name:        mlk_montgomery_reduce
+ *
+ * Description: Generic Montgomery reduction; given a 32-bit integer a, computes
+ *              16-bit integer congruent to a * R^-1 mod q, where R=2^16
+ *
+ * Arguments:   - int32_t a: input integer to be reduced, of absolute value
+ *                smaller or equal to INT32_MAX - 2^15 * MLKEM_Q.
+ *
+ * Returns:     integer congruent to a * R^-1 modulo q, with absolute value
+ *                <= ceil(|a| / 2^16) + (MLKEM_Q + 1)/2
+ *
+ **************************************************/
+static MLK_DEFAULT_INLINE int16_t mlk_montgomery_reduce(int32_t a)
+__contract__(
+    requires(a < +(INT32_MAX - (((int32_t)1 << 15) * MLKEM_Q)) &&
+	     a > -(INT32_MAX - (((int32_t)1 << 15) * MLKEM_Q)))
+    /* We don't attempt to express an input-dependent output bound
+     * as the post-condition here. There are two call-sites for this
+     * function:
+     * - The base multiplication: Here, we need no output bound.
+     * - mlk_fqmul: Here, we inline this function and prove another spec
+     *          for mlk_fqmul which does have a post-condition bound. */
+)
+{
+  /* check-magic: 62209 == unsigned_mod(pow(MLKEM_Q, -1, 2^16), 2^16) */
+  const uint32_t QINV = 62209;
+
+  /*  Compute a*q^{-1} mod 2^16 in unsigned representatives */
+  const uint16_t a_reduced = a & UINT16_MAX;
+  const uint16_t a_inverted = (a_reduced * QINV) & UINT16_MAX;
+
+  /* Lift to signed canonical representative mod 2^16. */
+  const int16_t t = mlk_cast_uint16_to_int16(a_inverted);
+
+  int32_t r;
+
+  mlk_assert(a < +(INT32_MAX - (((int32_t)1 << 15) * MLKEM_Q)) &&
+             a > -(INT32_MAX - (((int32_t)1 << 15) * MLKEM_Q)));
+
+  r = a - ((int32_t)t * MLKEM_Q);
+
+  /*
+   * PORTABILITY: Right-shift on a signed integer is, strictly-speaking,
+   * implementation-defined for negative left argument. Here,
+   * we assume it's sign-preserving "arithmetic" shift right. (C99 6.5.7 (5))
+   */
+  r = r >> 16;
+  /* Bounds: |r >> 16| <= ceil(|r| / 2^16)
+   *                   <= ceil(|a| / 2^16 + MLKEM_Q / 2)
+   *                   <= ceil(|a| / 2^16) + (MLKEM_Q + 1) / 2
+   *
+   * (Note that |a >> n| = ceil(|a| / 2^16) for negative a)
+   */
+  return (int16_t)r;
+}
+
+
 /*************************************************
  * Name:        mlk_fqmul
  *
