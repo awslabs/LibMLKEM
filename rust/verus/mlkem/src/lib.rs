@@ -288,6 +288,15 @@ pub fn fqmul (a : i16, b : i16) -> (r : i16)
   return montgomery_reduce_rod (arg);
 }
 
+#[inline(always)]
+#[verifier::external_body]
+fn array_get<T>(x: &[T], i: usize) -> (result: &T)
+  requires 0 <= i < x@.len()
+  ensures result == x@[i as int]
+{
+  unsafe { x.get_unchecked(i) }
+}
+
 #[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
@@ -435,7 +444,13 @@ pub fn ntt_layer (r : &mut Poly, layer : i16)
               forall|i:int| start <= i < N ==> (-layer * (Q as i16)) < #[trigger] r[i] < (layer * (Q as i16)),
     decreases N - start,
   {
+
+    // Lookup zeta, potentially with PANIC check
     let zeta : i16 = ZETAS[k];
+
+    // Lookup zeta, but using unsafe get_unchecked()
+    // let zeta : i16 = *array_get(&ZETAS, k);
+
     ntt_butterfly_block(r, zeta, start, len, layer * (Q as i16));
 
     // Adding 1 to k, and 2*len to start maintains the loop invariant,
