@@ -461,10 +461,10 @@ pub fn ntt_layer (r : &mut Poly, layer : i16)
   {
 
     // Lookup zeta, potentially with PANIC check
-    let zeta : i16 = ZETAS[k];
+    // let zeta : i16 = ZETAS[k];
 
     // Lookup zeta, but using unsafe get_unchecked()
-    // let zeta : i16 = *array_get(&ZETAS, k);
+    let zeta : i16 = *array_get(&ZETAS, k);
 
     ntt_butterfly_block(r, zeta, start, len, layer * (Q as i16));
 
