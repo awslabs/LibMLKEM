@@ -299,9 +299,9 @@ fn array_get<T>(x: &[T], i: usize) -> (result: &T)
 
 #[inline(always)]
 #[verifier::external_body]
-fn array_update<T>(x: &mut [T], i: usize, v : T)
-  requires 0 <= i < x@.len()
-  // ensures x == ??? err....
+fn array_update(x: &mut Poly, i: usize, v : i16)
+  requires 0 <= i < N
+  ensures x@ == old(x)@.update(i as int, v)
 {
   unsafe { let elem = x.get_unchecked_mut(i);
            *elem = v;
