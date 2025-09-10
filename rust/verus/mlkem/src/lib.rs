@@ -297,6 +297,19 @@ fn array_get<T>(x: &[T], i: usize) -> (result: &T)
   unsafe { x.get_unchecked(i) }
 }
 
+#[inline(always)]
+#[verifier::external_body]
+fn array_update<T>(x: &mut [T], i: usize, v : T)
+  requires 0 <= i < x@.len()
+  // ensures x == ??? err....
+{
+  unsafe { let elem = x.get_unchecked_mut(i);
+           *elem = v;
+  }
+}
+
+
+
 #[inline(never)]
 #[verifier::loop_isolation(false)]
 pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usize, _bound : i16)
@@ -332,9 +345,11 @@ pub fn ntt_butterfly_block (r : &mut Poly, zeta : i16, start : usize, len : usiz
               forall|i:int| start + len <= i < j + len ==> -(_bound + Q) < #[trigger] r[i] < _bound + Q,
               forall|i:int| j + len <= i < N ==> -_bound < #[trigger] r[i] < _bound,
   {
-     let t : i16 = fqmul(r[j + len], zeta);
-     r[j + len] = r[j] - t;
-     r[j]       = r[j] + t;
+     let rjl = *array_get(r, j + len);
+     let rj  = *array_get(r, j);
+     let t : i16 = fqmul(rjl, zeta);
+     array_update(r, j + len, rj - t);
+     array_update(r, j,       rj + t);
   }
 }
 
