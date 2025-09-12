@@ -451,7 +451,6 @@ fn signed_to_unsigned_q(a : i16) -> (r : i16)
 
 //#[inline(never)]
 pub fn poly_reduce (r : &mut Poly)
-  requires forall|i:int| 0 <= i < N ==> -NTT_BOUND < #[trigger] old(r)[i] < NTT_BOUND,
   ensures forall|i:int| 0 <= i < N ==> 0 <= #[trigger] r[i] < Q,
 {
   for i in 0 .. N
