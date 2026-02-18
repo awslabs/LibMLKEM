@@ -619,7 +619,7 @@ is
       T := T * Q_M;
       T := Shift_Right (T, Q_C);
 
-      --  To return a value in UDV, an explicit reduction is
+      --  To return a value in UDU, an explicit reduction is
       --  required here. This is missing in FIPS-203 Eq 4.5
       T := T mod C;
       return UDU (T);
